@@ -49,11 +49,9 @@ def get_current_admin(current_user: models.User = Depends(auth.get_current_user)
 # --- USER AND AUTHENTICATION ---
 @app.post("/register", response_model=schemas.UserResponse, tags=["Auth"])
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # Check if this is the very first user in the system
     user_count = db.query(models.User).count()
     is_first_user = user_count == 0
 
-    # If not the first user, check if registrations are open
     if not is_first_user:
         setting = db.query(models.SystemSetting).filter_by(key="allow_signups").first()
         allow_signups = setting.value == "true" if setting else True
@@ -69,7 +67,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         username=user.username,
         hashed_password=hashed_password,
         sync_strategy=user.sync_strategy,
-        is_admin=is_first_user # The first person to register becomes an admin
+        is_admin=is_first_user 
     )
     db.add(new_user)
     db.commit()
@@ -134,7 +132,6 @@ async def validate_gemini(request: schemas.ValidateGeminiRequest):
 @app.post("/update-index", tags=["Plugin Sync"])
 async def update_vault_index(request: schemas.IndexRequest, current_user: models.User = Depends(auth.get_current_user)):
     index_file = os.path.join(DATA_DIR, f"vault_index_{current_user.username}.json")
-    # Convert Pydantic objects to dicts
     notes_data = [note.dict() for note in request.notes]
     with open(index_file, "w", encoding="utf-8") as f:
         json.dump(notes_data, f, ensure_ascii=False)
@@ -163,7 +160,6 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         if os.path.exists(index_file):
             with open(index_file, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
-                # Fallback to handle old string-based indexes smoothly
                 for item in raw_data:
                     if isinstance(item, str):
                         vault_context_list.append({"path": item, "tags": []})
@@ -174,7 +170,6 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         if not content:
             raise HTTPException(status_code=400, detail="Could not find content at the provided link.")
 
-        # Pass the structured data and the multipass boolean
         markdown_result = await process_text_with_llm(
             url=request.url,
             title=title,
