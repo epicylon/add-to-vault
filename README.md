@@ -33,7 +33,7 @@ Crucially, *it is context-aware*. The companion Obsidian plugin sends a list of 
 
 1. Clone this repository to your server:
 ```
-git clone [https://github.com/yourusername/add-to-vault-server.git](https://github.com/yourusername/add-to-vault-server.git)
+git clone [https://github.com/epicylon/add-to-vault.git](https://github.com/epicylon/add-to-vault.git)
 cd add-to-vault-server
 ```
 
