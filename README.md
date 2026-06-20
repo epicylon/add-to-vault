@@ -1,7 +1,7 @@
 # add-to-vault
 A lightweight and modular service for adding articles, comments & finds to your Obsidian vault.
 
-**Transparency Notice:** This project is "vibe-coded". The architecture, backend logic, and frontend codebase were primarily written and iterated by Google's Gemini Pro large language model under the direction of a human project manager. The focus is on function, modularity, and privacy.
+**Transparency Notice:** *This project is "vibe-coded".* The architecture, backend logic, and frontend codebase were *primarily* written and iterated by Google's Gemini Pro large language model under the direction of a human project manager. The focus is on **function**, **modularity**, and **privacy**.
 
 Overview
 
