@@ -177,9 +177,9 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
             vault_context=context_string
         )
 
-        safe_title = re.sub(r'[\\/*?:"<>|]', "", title)
+        title_with_dash = title.replace("|", "-")
+        safe_title = re.sub(r'[\\/*?:"<>|]', "", title_with_dash)
         filename = f"{safe_title}.md"
-        filepath = os.path.join(VAULT_DIR, filename)
         
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(markdown_result)
