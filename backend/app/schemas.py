@@ -27,6 +27,10 @@ class PasswordChange(BaseModel):
 
 # --- SCHEMAS FOR INBOX & CONTEXT ---
 
+class NoteContext(BaseModel):
+    path: str
+    tags: List[str]
+
 class LinkRequest(BaseModel):
     url: str
 
@@ -35,7 +39,7 @@ class ProcessResponse(BaseModel):
     markdown: str
 
 class IndexRequest(BaseModel):
-    notes: List[str]
+    notes: List[NoteContext]
 
 # --- SCHEMAS FOR PLUGIN SETTINGS ---
 
@@ -46,3 +50,4 @@ class UserPrefsRequest(BaseModel):
     api_key: str
     model: str
     prompt_template: str
+    use_multipass: Optional[bool] = False
