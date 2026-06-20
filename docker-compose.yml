@@ -1,0 +1,16 @@
+services:
+  backend:
+    build: ./backend
+    container_name: add-to-vault
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+    volumes:
+      # Application code (useful for hot-reloading in development)
+      - ./backend/app:/app/app
+      # Persistent storage for SQLite database and user settings (JSON)
+      - ./backend/data:/app/data
+      # Temporary holding area (inbox) for generated Markdown files before the plugin fetches them
+      - ./vault:/app/vault
+    restart: unless-stopped
