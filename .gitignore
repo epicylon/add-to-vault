@@ -1,6 +1,31 @@
-# .gitignore
+Environments and Secrets
+
 venv/
-__pycache__/
+env/
+.env
+
+Project Specific Data (DO NOT COMMIT)
+
 backend/data/
 vault/
-.env
+
+Python Cache
+
+pycache/
+*.py[cod]
+*$py.class
+
+OS generated files
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+IDEs and Editors
+
+.vscode/
+.idea/
+*.swp
