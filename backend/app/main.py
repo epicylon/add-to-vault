@@ -134,8 +134,10 @@ async def validate_gemini(request: schemas.ValidateGeminiRequest):
 @app.post("/update-index", tags=["Plugin Sync"])
 async def update_vault_index(request: schemas.IndexRequest, current_user: models.User = Depends(auth.get_current_user)):
     index_file = os.path.join(DATA_DIR, f"vault_index_{current_user.username}.json")
+    # Convert Pydantic objects to dicts
+    notes_data = [note.dict() for note in request.notes]
     with open(index_file, "w", encoding="utf-8") as f:
-        json.dump(request.notes, f, ensure_ascii=False)
+        json.dump(notes_data, f, ensure_ascii=False)
     return {"status": "ok"}
 
 @app.post("/update-prefs", tags=["Plugin Sync"])
@@ -160,13 +162,19 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         index_file = os.path.join(DATA_DIR, f"vault_index_{current_user.username}.json")
         if os.path.exists(index_file):
             with open(index_file, "r", encoding="utf-8") as f:
-                vault_context_list = json.load(f)
-        context_string = ", ".join(vault_context_list) if vault_context_list else "No notes found."
+                raw_data = json.load(f)
+                # Fallback to handle old string-based indexes smoothly
+                for item in raw_data:
+                    if isinstance(item, str):
+                        vault_context_list.append({"path": item, "tags": []})
+                    else:
+                        vault_context_list.append(item)
 
         title, content = await run_in_threadpool(scrape_url, request.url)
         if not content:
             raise HTTPException(status_code=400, detail="Could not find content at the provided link.")
 
+        # Pass the structured data and the multipass boolean
         markdown_result = await process_text_with_llm(
             url=request.url,
             title=title,
@@ -174,12 +182,14 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
             api_key=prefs.get("api_key"),
             model_name=prefs.get("model", "gemini-2.5-flash"),
             prompt_template=prefs.get("prompt_template"),
-            vault_context=context_string
+            vault_context_data=vault_context_list,
+            use_multipass=prefs.get("use_multipass", False)
         )
 
         title_with_dash = title.replace("|", "-")
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title_with_dash)
         filename = f"{safe_title}.md"
+        filepath = os.path.join(VAULT_DIR, filename)
         
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(markdown_result)
