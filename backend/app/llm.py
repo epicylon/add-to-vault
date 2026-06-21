@@ -18,14 +18,14 @@ def get_llm(provider: str, model_name: str, api_key: str):
     elif provider == "mistral":
         return ChatMistralAI(model=model_name, temperature=temperature, api_key=api_key)
     elif provider == "kimi":
-        # Kimi (Moonshot AI) bruker OpenAI-kompatibelt API, vi overstyrer bare base_url
+        # Kimi (Moonshot AI) uses OpenAI-compatible API, base_url overruled
         return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key, base_url="https://api.moonshot.cn/v1")
     elif provider == "ollama":
-        # For Ollama forventer vi at brukeren skriver inn URL-en i API-nøkkel feltet, ellers faller vi tilbake til docker localhost
+        # For Ollama a URL is expected in the API-key field, or else fallback to docker localhost
         base_url = api_key if api_key and api_key.startswith("http") else "http://host.docker.internal:11434"
         return ChatOllama(model=model_name, temperature=temperature, base_url=base_url)
     else:
-        # Standard fallback er Google Gemini
+        # Standard fallback is Google Gemini
         return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
 
 async def process_text_with_llm(url: str, title: str, content: str, api_key: str, provider: str, model_name: str, prompt_template: str, vault_context_data: list, use_multipass: bool = False) -> str:
@@ -46,7 +46,7 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
             context_lines.append(f"- {note['path']} [{tags_str}]")
         context_string = "\n".join(context_lines) if context_lines else "No notes."
 
-        # Henter riktig LLM-klient fra fabrikken vår
+        # Fetches correct LLM-client
         llm = get_llm(provider, model_name, api_key)
 
         classified_tags_text = ""
