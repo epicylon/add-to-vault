@@ -120,12 +120,28 @@ def list_users(current_admin: models.User = Depends(get_current_admin), db: Sess
     return [{"id": u.id, "username": u.username, "is_admin": u.is_admin, "is_active": u.is_active} for u in users]
 
 # --- PLUGIN: CONTEXT AND SETTINGS ---
-@app.post("/validate-gemini", tags=["Plugin Sync"])
-async def validate_gemini(request: schemas.ValidateGeminiRequest):
+@app.post("/validate-provider", tags=["Plugin Sync"])
+async def validate_provider(request: schemas.ValidateProviderRequest):
     try:
-        genai.configure(api_key=request.api_key)
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        return {"supported_models": available_models}
+        provider = request.provider
+        api_key = request.api_key
+
+        if provider == "gemini":
+            genai.configure(api_key=api_key)
+            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            return {"supported_models": available_models}
+        elif provider == "openai":
+            return {"supported_models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]}
+        elif provider == "anthropic":
+            return {"supported_models": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-haiku-20240307"]}
+        elif provider == "mistral":
+            return {"supported_models": ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"]}
+        elif provider == "kimi":
+            return {"supported_models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]}
+        elif provider == "ollama":
+            return {"supported_models": ["llama3", "mistral", "gemma2", "phi3"]}
+        else:
+            return {"supported_models": []}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -138,12 +154,22 @@ async def update_vault_index(request: schemas.IndexRequest, current_user: models
         json.dump(notes_data, f, ensure_ascii=False)
     return {"status": "ok"}
 
-@app.post("/update-prefs", tags=["Plugin Sync"])
-async def update_user_prefs(request: schemas.UserPrefsRequest, current_user: models.User = Depends(auth.get_current_user)):
+@app.post("/update-prefs", tags=["Settings"])
+async def update_prefs(request: schemas.UserPrefsRequest, current_user: models.User = Depends(auth.get_current_user)):
     prefs_file = os.path.join(DATA_DIR, f"prefs_{current_user.username}.json")
+    prefs_data = {
+        "api_key": request.api_key,
+        "provider": request.provider,
+        "model": request.model,
+        "prompt_template": request.prompt_template,
+        "template_archivist": request.template_archivist,
+        "template_analyst": request.template_analyst,
+        "template_synthesist": request.template_synthesist,
+        "use_multipass": request.use_multipass
+    }
     with open(prefs_file, "w", encoding="utf-8") as f:
-        json.dump(request.dict(), f, ensure_ascii=False)
-    return {"status": "ok"}
+        json.dump(prefs_data, f, ensure_ascii=False)
+    return {"status": "success", "message": "Preferences updated"}
 
 # --- CORE FUNCTIONALITY (INBOX) ---
 @app.post("/process-link", response_model=schemas.ProcessResponse, tags=["Inbox"])
@@ -151,11 +177,12 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
     try:
         prefs_file = os.path.join(DATA_DIR, f"prefs_{current_user.username}.json")
         if not os.path.exists(prefs_file):
-            raise HTTPException(status_code=400, detail="Missing settings. Please sync from the Obsidian plugin first!")
+            raise HTTPException(status_code=400, detail="Preferences not configured. Please sync from Obsidian first.")
 
         with open(prefs_file, "r", encoding="utf-8") as f:
             prefs = json.load(f)
 
+        # Hent hvelvkontekst (filnavn og tags)
         vault_context_list = []
         index_file = os.path.join(DATA_DIR, f"vault_index_{current_user.username}.json")
         if os.path.exists(index_file):
@@ -168,6 +195,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
                     else:
                         vault_context_list.append(item)
 
+        # Skrap innholdet fra URL
         title, content = await run_in_threadpool(scrape_url, request.url)
         if not content:
             raise HTTPException(status_code=400, detail="Could not find content at the provided link.")
@@ -179,11 +207,13 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         if not prompt_template:
             raise HTTPException(status_code=400, detail=f"Missing template for mode: {mode}. Please configure it in Obsidian and sync.")
 
+        # Generer notat ved hjelp av det oppdaterte LLM-maskineriet
         markdown_result = await process_text_with_llm(
             url=request.url,
             title=title,
             content=content,
             api_key=prefs.get("api_key"),
+            provider=prefs.get("provider", "gemini"),  # Fallback til gemini hvis feltet mangler
             model_name=prefs.get("model", "gemini-2.5-flash"),
             prompt_template=prompt_template,
             vault_context_data=vault_context_list,
@@ -193,12 +223,14 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         title_with_dash = title.replace("|", "-")
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title_with_dash)
         filename = f"{safe_title}.md"
+
         filepath = os.path.join(VAULT_DIR, filename)
-        
+
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(markdown_result)
 
         return schemas.ProcessResponse(title=title, markdown=markdown_result)
+
     except HTTPException:
         raise
     except Exception as e:
