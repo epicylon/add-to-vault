@@ -237,7 +237,7 @@
             status.classList.add('hidden');
 
             try {
-                const res = await fetch('/process', {
+                const res = await fetch('/process-link', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -289,39 +289,50 @@
             msg.classList.remove('hidden');
         });
 
-        // ADMIN
+		// ADMIN
         async function checkAdmin() {
             try {
-                const res = await fetch('/admin/status', {
+                const res = await fetch('/users/me', {
                     headers: {'Authorization': `Bearer ${token}`}
                 });
                 if(res.ok) {
-                    document.getElementById('navAdmin').classList.remove('hidden');
-                    loadAdminData();
+                    const userData = await res.json();
+                    if(userData.is_admin) {
+                        document.getElementById('navAdmin').classList.remove('hidden');
+                        loadAdminData();
+                    }
                 }
             } catch(e) {}
         }
 
         async function loadAdminData() {
             try {
-                const res = await fetch('/admin/users', {
-                    headers: {'Authorization': `Bearer ${token}`}
-                });
-                if(!res.ok) return;
-                const data = await res.json();
+                const setRes = await fetch('/admin/settings');
+                const settings = await setRes.json();
 
                 const btn = document.getElementById('toggleSignupBtn');
-                if(data.signups_open) {
-                    btn.innerText = 'ON';
-                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-green-600 text-white';
+                if(settings.allow_signups) {
+                    btn.innerText = 'OPEN';
+                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-green-600 text-white hover:bg-green-500';
                 } else {
-                    btn.innerText = 'OFF';
-                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-gray-600 text-gray-300';
+                    btn.innerText = 'CLOSED';
+                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-red-900 text-red-100 hover:bg-red-800';
                 }
 
+                const userRes = await fetch('/admin/users', {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                const users = await userRes.json();
+
                 const list = document.getElementById('userList');
-                list.innerHTML = (data.users || []).map(u => 
-                    `<div class="flex justify-between text-sm p-2 bg-gray-900 rounded"><span class="text-gray-300">${u}</span></div>`
+                list.innerHTML = users.map(u => 
+                    `<div class="flex justify-between items-center text-sm p-3 bg-gray-900 rounded border border-gray-800 mb-2">
+                        <div>
+                            <span class="text-white font-medium">${u.username}</span>
+                            ${u.is_admin ? '<span class="ml-2 text-[10px] uppercase tracking-wider bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded border border-purple-700">Admin</span>' : ''}
+                        </div>
+                        <span class="text-gray-500">ID: ${u.id}</span>
+                    </div>`
                 ).join('');
             } catch(e) {}
         }
@@ -335,26 +346,3 @@
                 loadAdminData();
             } catch(e) {}
         }
-
-        // LOGOUT
-        function logout() {
-            token = null;
-            currentUser = null;
-            localStorage.removeItem('vault_token');
-            document.getElementById('dashboardSection').classList.add('hidden');
-            document.getElementById('authSection').classList.remove('hidden');
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('authError').classList.add('hidden');
-        }
-
-        // INIT
-        if(token) {
-            currentUser = 'User';
-            showDashboard();
-        } else {
-            document.getElementById('authSection').classList.remove('hidden');
-        }
-    </script>
-</body>
-</html>
