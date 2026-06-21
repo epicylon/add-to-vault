@@ -132,6 +132,7 @@ async def validate_gemini(request: schemas.ValidateGeminiRequest):
 @app.post("/update-index", tags=["Plugin Sync"])
 async def update_vault_index(request: schemas.IndexRequest, current_user: models.User = Depends(auth.get_current_user)):
     index_file = os.path.join(DATA_DIR, f"vault_index_{current_user.username}.json")
+    # Convert Pydantic objects to dicts
     notes_data = [note.dict() for note in request.notes]
     with open(index_file, "w", encoding="utf-8") as f:
         json.dump(notes_data, f, ensure_ascii=False)
@@ -160,6 +161,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         if os.path.exists(index_file):
             with open(index_file, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
+                # Fallback to handle old string-based indexes smoothly
                 for item in raw_data:
                     if isinstance(item, str):
                         vault_context_list.append({"path": item, "tags": []})
@@ -170,13 +172,20 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         if not content:
             raise HTTPException(status_code=400, detail="Could not find content at the provided link.")
 
+        mode = request.mode or "analyst"
+        template_key = f"template_{mode}"
+        prompt_template = prefs.get(template_key, prefs.get("prompt_template"))
+
+        if not prompt_template:
+            raise HTTPException(status_code=400, detail=f"Missing template for mode: {mode}. Please configure it in Obsidian and sync.")
+
         markdown_result = await process_text_with_llm(
             url=request.url,
             title=title,
             content=content,
             api_key=prefs.get("api_key"),
             model_name=prefs.get("model", "gemini-2.5-flash"),
-            prompt_template=prefs.get("prompt_template"),
+            prompt_template=prompt_template,
             vault_context_data=vault_context_list,
             use_multipass=prefs.get("use_multipass", False)
         )
