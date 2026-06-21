@@ -3,11 +3,17 @@ A lightweight and modular service for adding articles, comments & finds to your 
 
 **Transparency Notice:** *This project is "vibe-coded".* The architecture, backend logic, and frontend codebase were *primarily* written and iterated by Google's Gemini Pro large language model under the direction of a human project manager. The focus is on **function**, **modularity**, and **privacy**.
 
+![alt text](https://raw.githubusercontent.com/epicylon/add-to-vault/refs/heads/demo/scr/atv-screenshot-1.png "Add To Vault Overview")
+
 ### Overview
 
 **Add To Vault** is a self-hosted backend and web interface designed to bridge the gap between your web browser and your Obsidian vault. Instead of manually copying text or relying on heavy third-party sync services, you paste a URL into the web dashboard. The server scrapes the content, uses an LLM (Google Gemini) to summarize and format it into Markdown, and holds it in a secure inbox until your Obsidian client pulls it down.
 
-Crucially, *it is context-aware*. The companion Obsidian plugin sends a list of your existing vault note titles to the server, allowing the LLM to automatically generate internal ```[[links]]``` to concepts you already have notes on.
+**Crucially, *it is context-aware***. The companion Obsidian plugin sends a list of your existing vault note titles to the server, allowing the LLM to automatically generate internal ```[[links]]``` to concepts you already have notes on.
+
+<div align="center">
+  <h3><a href="https://epicylon.github.io/add-to-vault/">Try out a demo simulation here</a></h3>
+</div>
 
 ### Features
 
@@ -79,3 +85,9 @@ Once the plugin is installed in Obsidian, go to its settings:
 ### Architecture
 
 The project consists of a **FastAPI** backend utilizing **SQLAlchemy** *(SQLite)* for user management. Web scraping is handled via **BeautifulSoup4**. LLM interactions are orchestrated through **LangChain**. The frontend is a single-page HTML application styled with **Tailwind CSS**, served directly by FastAPI.
+
+<div align="center">
+  <a href="https://www.buymeacoffee.com/clinch">
+    <img src="https://github.com/epicylon/add-to-vault/blob/demo/scr/blue-button.png?raw=true" alt="Buy Me A Coffee" width="200" />
+  </a>
+</div>
