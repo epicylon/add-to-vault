@@ -13,16 +13,18 @@ The self-hosted backend engine for the ***Add To Vault ecosystem***. This server
 
 2. The server intelligently scrapes the content (bypassing anti-bot walls using RSS fallbacks and Jina Reader for complex SPAs like Reddit/X).
 
-3. It formats the text using a user-selected LLM, based on your preferred **"Processing Mode"** *(Archivist, Analyst, or Synthesist)*.
+3. It formats the text using your active **LLM Provider** *(natively supporting Google Gemini, OpenAI, Anthropic, Mistral, Kimi, and local Ollama deployments)* based on your preferred **"Processing Mode"** *(Archivist, Analyst, or Synthesist)*.
 
 4. It cross-references your existing Obsidian tags and file names to generate intelligent ```[[internal links]]```.
 
 5. The companion Obsidian plugin automatically fetches the generated Markdown file and places it securely in your vault.
 
 ### Key Features
+- **LLM Agnostic:** Bring your own AI. Built-in support for OpenAI, Anthropic, Google Gemini, Mistral, Kimi, and self-hosted privacy-first models via Ollama.
+
 - **Smart Scraping:** Fallback mechanisms for difficult domains.
 
-- Three Processing Modes:
+- **Three Processing Modes:**
   - **Archivist:** *Exact, cleaned-up copy for long-form archiving.*
 
   - **Analyst:** *Balanced summary with key takeaways.*
