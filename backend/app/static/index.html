@@ -289,6 +289,376 @@
             msg.classList.remove('hidden');
         });
 
+        // ADMIN
+        async function checkAdmin() {
+            try {
+                const res = await fetch('/users/me', {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                if(res.ok) {
+                    const userData = await res.json();
+                    if(userData.is_admin) {
+                        document.getElementById('navAdmin').classList.remove('hidden');
+                        loadAdminData();
+                    }
+                }
+            } catch(e) {}
+        }
+
+        async function loadAdminData() {
+            try {
+                const setRes = await fetch('/admin/settings');
+                const settings = await setRes.json();
+
+                const btn = document.getElementById('toggleSignupBtn');
+                if(settings.allow_signups) {
+                    btn.innerText = 'OPEN';
+                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-green-600 text-white hover:bg-green-500';
+                } else {
+                    btn.innerText = 'CLOSED';
+                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-red-900 text-red-100 hover:bg-red-800';
+                }
+
+                const userRes = await fetch('/admin/users', {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                const users = await userRes.json();
+
+                const list = document.getElementById('userList');
+                list.innerHTML = users.map(u => 
+                    `<div class="flex justify-between items-center text-sm p-3 bg-gray-900 rounded border border-gray-800 mb-2">
+                        <div>
+                            <span class="text-white font-medium">${u.username}</span>
+                            ${u.is_admin ? '<span class="ml-2 text-[10px] uppercase tracking-wider bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded border border-purple-700">Admin</span>' : ''}
+                        </div>
+                        <span class="text-gray-500">ID: ${u.id}</span>
+                    </div>`
+                ).join('');
+            } catch(e) {}
+        }
+
+        async function toggleSignups() {
+            try {
+                await fetch('/admin/toggle-signups', {
+                    method: 'POST',
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                loadAdminData();
+            } catch(e) {}
+        }
+
+        // LOGOUT
+        function logout() {
+            token = null;
+            currentUser = null;
+            localStorage.removeItem('vault_token');
+            document.getElementById('dashboardSection').classList.add('hidden');
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('authError').classList.add('hidden');
+        }
+
+        // INIT
+        if(token) {
+            currentUser = 'User';
+            showDashboard();
+        } else {
+            document.getElementById('authSection').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add To Vault</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: { colors: { obsidian: { 800: '#1e1e1e', 900: '#111111', accent: '#7c3aed' } } }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #111111; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .spinner { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid #7c3aed; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tab-active { border-bottom: 2px solid #7c3aed; color: #fff; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-lg bg-obsidian-800 rounded-xl shadow-2xl p-8 border border-gray-800">
+
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold tracking-tight text-white mb-1">Add To Vault</h1>
+        </div>
+
+        <div id="authSection" class="space-y-6">
+            <div class="flex justify-center space-x-4 border-b border-gray-700 mb-4">
+                <button onclick="toggleAuth('login')" id="tabLogin" class="pb-2 px-2 tab-active transition">Log in</button>
+                <button onclick="toggleAuth('register')" id="tabRegister" class="pb-2 px-2 text-gray-500 transition">Register</button>
+            </div>
+
+            <form id="authForm" class="space-y-4">
+                <input type="hidden" id="authMode" value="login">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Username</label>
+                    <input type="text" id="username" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-obsidian-accent text-white" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Password</label>
+                    <input type="password" id="password" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-obsidian-accent text-white" required>
+                </div>
+                <button type="submit" class="w-full bg-obsidian-accent hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
+                    <span id="authBtnText">Log in</span>
+                </button>
+                <p id="authError" class="text-red-400 text-sm mt-2 hidden"></p>
+            </form>
+        </div>
+
+        <div id="dashboardSection" class="hidden">
+
+            <div class="flex space-x-6 border-b border-gray-700 mb-6">
+                <button onclick="switchView('inbox')" id="navInbox" class="pb-2 tab-active transition">Inbox</button>
+                <button onclick="switchView('profile')" id="navProfile" class="pb-2 text-gray-500 transition">Profile</button>
+                <button onclick="switchView('admin')" id="navAdmin" class="pb-2 text-gray-500 transition hidden text-purple-400">Admin</button>
+            </div>
+
+            <div id="viewInbox" class="space-y-4">
+                <form id="linkForm" class="space-y-4">
+                    <div>
+                        <input type="url" id="urlInput" placeholder="Paste URL..." class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-obsidian-accent text-white" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Processing Mode</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" id="mode-archivist" onclick="setMode('archivist')" class="mode-btn border border-gray-700 text-gray-400 hover:border-gray-500 py-2 rounded-lg text-sm transition">Archivist</button>
+                            <button type="button" id="mode-analyst" onclick="setMode('analyst')" class="mode-btn border border-obsidian-accent text-purple-400 bg-purple-900/20 py-2 rounded-lg text-sm transition">Analyst</button>
+                            <button type="button" id="mode-synthesist" onclick="setMode('synthesist')" class="mode-btn border border-gray-700 text-gray-400 hover:border-gray-500 py-2 rounded-lg text-sm transition">Synthesist</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="w-full bg-obsidian-accent hover:bg-purple-600 text-white font-semibold py-3 px-4 rounded-lg flex justify-center items-center mt-2">
+                        <span id="btnText">Process & Save</span>
+                        <div id="btnSpinner" class="spinner hidden"></div>
+                    </button>
+                </form>
+                <div id="statusMessage" class="mt-4 p-4 rounded-lg hidden text-sm"></div>
+            </div>
+
+            <div id="viewProfile" class="space-y-4 hidden">
+                <div class="bg-black p-4 rounded-lg border border-gray-700">
+                    <p class="text-sm text-gray-400 mb-1">Logged in as:</p>
+                    <p id="profileName" class="text-lg font-bold text-white"></p>
+                </div>
+
+                <div class="bg-black p-4 rounded-lg border border-gray-700 relative">
+                    <p class="text-sm text-gray-400 mb-2">Bearer Token (for Obsidian)</p>
+                    <p id="tokenBox" class="font-mono text-xs text-white break-all blur-sm select-none transition-all duration-300">Loading...</p>
+                    <button onclick="toggleToken()" class="mt-3 bg-gray-800 hover:bg-gray-700 text-xs text-gray-300 py-1 px-3 rounded border border-gray-600 transition">Show / Hide Token</button>
+                </div>
+
+                <form id="passwordForm" class="space-y-3 pt-2">
+                    <h3 class="text-sm font-semibold text-gray-300">Change password</h3>
+                    <input type="password" id="oldPw" placeholder="Old password" class="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" required>
+                    <input type="password" id="newPw" placeholder="New password" class="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" required>
+                    <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg text-sm transition w-full">Update password</button>
+                    <p id="pwMessage" class="text-sm hidden mt-2"></p>
+                </form>
+                <div class="border-t border-gray-800 pt-4 mt-4">
+                    <button onclick="logout()" class="w-full border border-red-900 text-red-400 hover:bg-red-900 py-2 rounded-lg transition text-sm">Log out</button>
+                </div>
+            </div>
+
+            <div id="viewAdmin" class="space-y-6 hidden">
+                <div class="bg-black p-4 rounded-lg border border-gray-700 flex justify-between items-center">
+                    <div>
+                        <p class="text-white font-semibold">Open Registration</p>
+                        <p class="text-xs text-gray-400">Allow new users to create accounts</p>
+                    </div>
+                    <button id="toggleSignupBtn" onclick="toggleSignups()" class="px-3 py-1 rounded text-sm font-bold transition"></button>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2">Registered Users</h3>
+                    <div id="userList" class="space-y-2 max-h-40 overflow-y-auto pr-2"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        let currentUser = null;
+        let currentMode = 'analyst';
+        let token = localStorage.getItem('vault_token');
+
+        // MODE LOGIC
+        function setMode(mode) {
+            currentMode = mode;
+            ['archivist', 'analyst', 'synthesist'].forEach(m => {
+                const btn = document.getElementById(`mode-${m}`);
+                btn.className = "mode-btn border border-gray-700 text-gray-400 hover:border-gray-500 py-2 rounded-lg text-sm transition";
+            });
+            const activeBtn = document.getElementById(`mode-${mode}`);
+            activeBtn.className = "mode-btn border border-obsidian-accent text-purple-400 bg-purple-900/20 py-2 rounded-lg text-sm transition";
+        }
+
+        // TOKEN LOGIC
+        function toggleToken() {
+            const box = document.getElementById('tokenBox');
+            if (box.classList.contains('blur-sm')) {
+                box.classList.remove('blur-sm', 'select-none');
+            } else {
+                box.classList.add('blur-sm', 'select-none');
+            }
+        }
+
+        // AUTH LOGIC
+        function toggleAuth(mode) {
+            document.getElementById('authMode').value = mode;
+            document.getElementById('authError').classList.add('hidden');
+            if(mode === 'login') {
+                document.getElementById('tabLogin').classList.replace('text-gray-500', 'tab-active');
+                document.getElementById('tabRegister').classList.replace('tab-active', 'text-gray-500');
+                document.getElementById('authBtnText').innerText = 'Log in';
+            } else {
+                document.getElementById('tabRegister').classList.replace('text-gray-500', 'tab-active');
+                document.getElementById('tabLogin').classList.replace('tab-active', 'text-gray-500');
+                document.getElementById('authBtnText').innerText = 'Register';
+            }
+        }
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const mode = document.getElementById('authMode').value;
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const err = document.getElementById('authError');
+
+            try {
+                if(mode === 'register') {
+                    const res = await fetch('/register', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({username: u, password: p, sync_strategy: 'plugin'})
+                    });
+                    if(!res.ok) throw new Error((await res.json()).detail || "Registration error");
+                }
+
+                const fd = new FormData();
+                fd.append('username', u);
+                fd.append('password', p);
+
+                const loginRes = await fetch('/token', {
+                    method: 'POST',
+                    body: fd
+                });
+
+                if(!loginRes.ok) throw new Error("Login failed");
+                const data = await loginRes.json();
+                token = data.access_token;
+                localStorage.setItem('vault_token', token);
+                currentUser = u;
+                showDashboard();
+            } catch (error) {
+                err.innerText = error.message;
+                err.classList.remove('hidden');
+            }
+        });
+
+        // DASHBOARD LOGIC
+        function showDashboard() {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('dashboardSection').classList.remove('hidden');
+            document.getElementById('profileName').innerText = currentUser;
+            document.getElementById('tokenBox').innerText = token;
+            switchView('inbox');
+            checkAdmin();
+        }
+
+        function switchView(view) {
+            ['inbox', 'profile', 'admin'].forEach(v => {
+                document.getElementById(`view${v.charAt(0).toUpperCase() + v.slice(1)}`).classList.add('hidden');
+                const nav = document.getElementById(`nav${v.charAt(0).toUpperCase() + v.slice(1)}`);
+                if(nav) nav.classList.replace('tab-active', 'text-gray-500');
+            });
+            document.getElementById(`view${view.charAt(0).toUpperCase() + view.slice(1)}`).classList.remove('hidden');
+            const activeNav = document.getElementById(`nav${view.charAt(0).toUpperCase() + view.slice(1)}`);
+            if(activeNav) activeNav.classList.replace('text-gray-500', 'tab-active');
+        }
+
+        // LINK SUBMISSION
+        document.getElementById('linkForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('urlInput').value;
+            const btnText = document.getElementById('btnText');
+            const spinner = document.getElementById('btnSpinner');
+            const status = document.getElementById('statusMessage');
+
+            btnText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            status.classList.add('hidden');
+
+            try {
+                const res = await fetch('/process-link', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({url: url, mode: currentMode})
+                });
+
+                if(!res.ok) throw new Error("Processing failed");
+                const data = await res.json();
+                status.innerText = `Success! Saved to: ${data.path || 'vault'}`;
+                status.className = "mt-4 p-4 rounded-lg text-sm bg-green-900/30 text-green-400 border border-green-800";
+                document.getElementById('urlInput').value = '';
+            } catch (error) {
+                status.innerText = error.message;
+                status.className = "mt-4 p-4 rounded-lg text-sm bg-red-900/30 text-red-400 border border-red-800";
+            } finally {
+                btnText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+                status.classList.remove('hidden');
+            }
+        });
+
+        // PASSWORD CHANGE
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('pwMessage');
+            try {
+                const res = await fetch('/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        old_password: document.getElementById('oldPw').value,
+                        new_password: document.getElementById('newPw').value
+                    })
+                });
+                if(!res.ok) throw new Error("Failed to change password");
+                msg.innerText = "Password updated successfully";
+                msg.className = "text-sm mt-2 text-green-400";
+                document.getElementById('oldPw').value = '';
+                document.getElementById('newPw').value = '';
+            } catch (error) {
+                msg.innerText = error.message;
+                msg.className = "text-sm mt-2 text-red-400";
+            }
+            msg.classList.remove('hidden');
+        });
+
 		// ADMIN
         async function checkAdmin() {
             try {
