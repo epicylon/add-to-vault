@@ -23,12 +23,12 @@
 <body class="min-h-screen flex items-center justify-center p-4">
 
     <div class="w-full max-w-lg bg-obsidian-800 rounded-xl shadow-2xl p-8 border border-gray-800">
-        
+
         <div class="text-center mb-6">
             <h1 class="text-3xl font-bold tracking-tight text-white mb-1">Add To Vault</h1>
         </div>
 
-        <div id="authSection" class="hidden space-y-6">
+        <div id="authSection" class="space-y-6">
             <div class="flex justify-center space-x-4 border-b border-gray-700 mb-4">
                 <button onclick="toggleAuth('login')" id="tabLogin" class="pb-2 px-2 tab-active transition">Log in</button>
                 <button onclick="toggleAuth('register')" id="tabRegister" class="pb-2 px-2 text-gray-500 transition">Register</button>
@@ -52,7 +52,7 @@
         </div>
 
         <div id="dashboardSection" class="hidden">
-            
+
             <div class="flex space-x-6 border-b border-gray-700 mb-6">
                 <button onclick="switchView('inbox')" id="navInbox" class="pb-2 tab-active transition">Inbox</button>
                 <button onclick="switchView('profile')" id="navProfile" class="pb-2 text-gray-500 transition">Profile</button>
@@ -64,7 +64,7 @@
                     <div>
                         <input type="url" id="urlInput" placeholder="Paste URL..." class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-obsidian-accent text-white" required>
                     </div>
-                    
+
                     <div>
                         <label class="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Processing Mode</label>
                         <div class="grid grid-cols-3 gap-2">
@@ -87,7 +87,7 @@
                     <p class="text-sm text-gray-400 mb-1">Logged in as:</p>
                     <p id="profileName" class="text-lg font-bold text-white"></p>
                 </div>
-                
+
                 <div class="bg-black p-4 rounded-lg border border-gray-700 relative">
                     <p class="text-sm text-gray-400 mb-2">Bearer Token (for Obsidian)</p>
                     <p id="tokenBox" class="font-mono text-xs text-white break-all blur-sm select-none transition-all duration-300">Loading...</p>
@@ -127,16 +127,15 @@
         const API_URL = '';
         let currentUser = null;
         let currentMode = 'analyst';
+        let token = localStorage.getItem('vault_token');
 
         // MODE LOGIC
         function setMode(mode) {
             currentMode = mode;
-            // Reset all buttons
             ['archivist', 'analyst', 'synthesist'].forEach(m => {
                 const btn = document.getElementById(`mode-${m}`);
                 btn.className = "mode-btn border border-gray-700 text-gray-400 hover:border-gray-500 py-2 rounded-lg text-sm transition";
             });
-            // Highlight active
             const activeBtn = document.getElementById(`mode-${mode}`);
             activeBtn.className = "mode-btn border border-obsidian-accent text-purple-400 bg-purple-900/20 py-2 rounded-lg text-sm transition";
         }
@@ -182,600 +181,180 @@
                     });
                     if(!res.ok) throw new Error((await res.json()).detail || "Registration error");
                 }
-                
-                const fd = new FormData(); fd<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add To Vault</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #121212;
-            --container-bg: #1e1e1e;
-            --accent-color: #8b5cf6;
-            --text-color: #e0e0e0;
-            --input-bg: #2d2d2d;
-            --success-color: #10b981;
-        }
 
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
+                const fd = new FormData();
+                fd.append('username', u);
+                fd.append('password', p);
 
-        .container {
-            background-color: var(--container-bg);
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            width: 100%;
-            max-width: 450px;
-        }
-
-        h1 { text-align: center; margin-bottom: 1.5rem; }
-
-        .tabs {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            border-bottom: 1px solid #333;
-            padding-bottom: 0.5rem;
-        }
-
-        .tab {
-            cursor: pointer;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            color: #888;
-        }
-
-        .tab.active {
-            color: var(--accent-color);
-            background: rgba(139, 92, 246, 0.1);
-        }
-
-        .view { display: none; }
-        .view.active { display: block; }
-
-        .input-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: 0.5rem; color: #888; font-size: 0.9rem; }
-
-        input {
-            width: 100%;
-            padding: 0.75rem;
-            background: var(--input-bg);
-            border: 1px solid #333;
-            border-radius: 0.5rem;
-            color: white;
-            box-sizing: border-box;
-        }
-
-        /* --- MODE SELECTOR STYLES --- */
-        .mode-selector {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .mode-btn {
-            background: var(--input-bg);
-            border: 1px solid #333;
-            padding: 0.6rem;
-            border-radius: 0.5rem;
-            color: #888;
-            cursor: pointer;
-            font-size: 0.8rem;
-            text-align: center;
-            transition: all 0.2s;
-        }
-
-        .mode-btn.active {
-            border-color: var(--accent-color);
-            color: var(--accent-color);
-            background: rgba(139, 92, 246, 0.1);
-        }
-
-        button.primary {
-            width: 100%;
-            padding: 0.75rem;
-            background: var(--accent-color);
-            border: none;
-            border-radius: 0.5rem;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .message {
-            margin-top: 1rem;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            display: none;
-        }
-
-        .message.success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); border: 1px solid var(--success-color); display: block; }
-
-        /* --- PROFILE STYLES --- */
-        .token-display {
-            background: #000;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            font-family: monospace;
-            word-break: break-all;
-            margin-top: 0.5rem;
-            position: relative;
-            font-size: 0.85rem;
-            border: 1px solid #333;
-        }
-
-        .blurred { filter: blur(5px); user-select: none; }
-        .reveal-btn {
-            margin-top: 0.5rem;
-            background: none;
-            border: 1px solid #444;
-            color: #888;
-            padding: 0.4rem 0.8rem;
-            border-radius: 0.3rem;
-            cursor: pointer;
-            font-size: 0.75rem;
-        }
-    </style>
-</head>
-<body>
-    <div class="container" id="auth-container">
-        <h1>Welcome</h1>
-        <div class="input-group">
-            <input type="text" id="username" placeholder="Username">
-        </div>
-        <div class="input-group">
-            <input type="password" id="password" placeholder="Password">
-        </div>
-        <button class="primary" onclick="login()">Login / Register</button>
-    </div>
-
-    <div class="container" id="main-container" style="display:none;">
-        <h1>Add To Vault</h1>
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('inbox')">Inbox</div>
-            <div class="tab" onclick="switchTab('profile')">Profile</div>
-        </div>
-
-        <div id="inbox-view" class="view active">
-            <div class="input-group">
-                <input type="text" id="url-input" placeholder="Paste URL...">
-            </div>
-            
-            <label>Processing Mode</label>
-            <div class="mode-selector">
-                <div class="mode-btn" onclick="setMode('archivist')" id="mode-archivist">Archivist</div>
-                <div class="mode-btn active" onclick="setMode('analyst')" id="mode-analyst">Analyst</div>
-                <div class="mode-btn" onclick="setMode('synthesist')" id="mode-synthesist">Synthesist</div>
-            </div>
-
-            <button class="primary" id="process-btn" onclick="processLink()">Process & Save</button>
-            <div id="status-message" class="message"></div>
-        </div>
-
-        <div id="profile-view" class="view">
-            <p>Logged in as: <strong id="user-display"></strong></p>
-            <label>Your Bearer Token (for Obsidian)</label>
-            <div id="token-box" class="token-display blurred">Loading...</div>
-            <button class="reveal-btn" onclick="toggleToken()">Show / Hide Token</button>
-            <br><br>
-            <button class="primary" style="background:#ef4444;" onclick="logout()">Logout</button>
-        </div>
-    </div>
-
-    <script>
-        let currentMode = 'analyst';
-
-        function setMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`mode-${mode}`).classList.add('active');
-        }
-
-        async function login() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            
-            // Try register first
-            try {
-                await fetch('/register', {
+                const loginRes = await fetch('/token', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: u, password: p})
+                    body: fd
                 });
-            } catch(e) {}
 
-            const resp = await fetch('/token', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: `username=${u}&password=${p}`
-            });
-
-            if (resp.ok) {
-                const data = await resp.json();
-                localStorage.setItem('access_token', data.access_token);
-                localStorage.setItem('username', u);
-                showMain();
-            } else {
-                alert('Login failed');
-            }
-        }
-
-        function showMain() {
-            document.getElementById('auth-container').style.display = 'none';
-            document.getElementById('main-container').style.display = 'block';
-            document.getElementById('user-display').innerText = localStorage.getItem('username');
-            document.getElementById('token-box').innerText = localStorage.getItem('access_token');
-        }
-
-        function toggleToken() {
-            const box = document.getElementById('token-box');
-            box.classList.toggle('blurred');
-        }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            event.target.classList.add('active');
-            document.getElementById(`${tab}-view`).classList.add('active');
-        }
-
-        async function processLink() {
-            const url = document.getElementById('url-input').value;
-            const btn = document.getElementById('process-btn');
-            const msg = document.getElementById('status-message');
-            
-            if(!url) return;
-            
-            btn.disabled = true;
-            btn.innerText = 'Processing...';
-            msg.className = 'message';
-
-            const resp = await fetch('/process-link', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                },
-                body: JSON.stringify({ url: url, mode: currentMode })
-            });
-
-            const data = await resp.json();
-            btn.disabled = false;
-            btn.innerText = 'Process & Save';
-
-            if (resp.ok) {
-                msg.innerHTML = `Success!<br>"${data.title}" is ready in the inbox.`;
-                msg.className = 'message success';
-                document.getElementById('url-input').value = '';
-            } else {
-                alert('Error: ' + data.detail);
-            }
-        }
-
-        function logout() {
-            localStorage.clear();
-            location.reload();
-        }
-
-        if (localStorage.getItem('access_token')) showMain();
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add To Vault</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: { colors: { obsidian: { 800: '#1e1e1e', 900: '#111111', accent: '#7c3aed' } } }
-            }
-        }
-    </script>
-    <style>
-        body { background-color: #111111; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .spinner { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid #7c3aed; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .tab-active { border-bottom: 2px solid #7c3aed; color: #fff; }
-    </style>
-</head>
-<body class="min-h-screen flex items-center justify-center p-4">
-
-    <div class="w-full max-w-lg bg-obsidian-800 rounded-xl shadow-2xl p-8 border border-gray-800">
-        
-        <div class="text-center mb-6">
-            <h1 class="text-3xl font-bold tracking-tight text-white mb-1">Add To Vault</h1>
-        </div>
-
-        <!-- LOGIN / REGISTER -->
-        <div id="authSection" class="hidden space-y-6">
-            <div class="flex justify-center space-x-4 border-b border-gray-700 mb-4">
-                <button onclick="toggleAuth('login')" id="tabLogin" class="pb-2 px-2 tab-active transition">Log in</button>
-                <button onclick="toggleAuth('register')" id="tabRegister" class="pb-2 px-2 text-gray-500 transition">Register</button>
-            </div>
-
-            <form id="authForm" class="space-y-4">
-                <input type="hidden" id="authMode" value="login">
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Username</label>
-                    <input type="text" id="username" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-obsidian-accent text-white" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Password</label>
-                    <input type="password" id="password" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-obsidian-accent text-white" required>
-                </div>
-                <button type="submit" class="w-full bg-obsidian-accent hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
-                    <span id="authBtnText">Log in</span>
-                </button>
-                <p id="authError" class="text-red-400 text-sm mt-2 hidden"></p>
-            </form>
-        </div>
-
-        <!-- DASHBOARD (Logged in) -->
-        <div id="dashboardSection" class="hidden">
-            
-            <div class="flex space-x-6 border-b border-gray-700 mb-6">
-                <button onclick="switchView('inbox')" id="navInbox" class="pb-2 tab-active transition">Inbox</button>
-                <button onclick="switchView('profile')" id="navProfile" class="pb-2 text-gray-500 transition">Profile</button>
-                <button onclick="switchView('admin')" id="navAdmin" class="pb-2 text-gray-500 transition hidden text-purple-400">Admin</button>
-            </div>
-
-            <!-- VIEW: INBOX -->
-            <div id="viewInbox" class="space-y-4">
-                <form id="linkForm" class="space-y-4">
-                    <div>
-                        <input type="url" id="urlInput" placeholder="Paste URL..." class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-obsidian-accent text-white" required>
-                    </div>
-                    <button type="submit" id="submitBtn" class="w-full bg-obsidian-accent hover:bg-purple-600 text-white font-semibold py-3 px-4 rounded-lg flex justify-center items-center">
-                        <span id="btnText">Process & Save</span>
-                        <div id="btnSpinner" class="spinner hidden"></div>
-                    </button>
-                </form>
-                <div id="statusMessage" class="mt-4 p-4 rounded-lg hidden text-sm"></div>
-            </div>
-
-            <!-- VIEW: PROFILE -->
-            <div id="viewProfile" class="space-y-4 hidden">
-                <div class="bg-black p-4 rounded-lg border border-gray-700">
-                    <p class="text-sm text-gray-400 mb-1">Logged in as:</p>
-                    <p id="profileName" class="text-lg font-bold text-white"></p>
-                </div>
-                <form id="passwordForm" class="space-y-3 pt-2">
-                    <h3 class="text-sm font-semibold text-gray-300">Change password</h3>
-                    <input type="password" id="oldPw" placeholder="Old password" class="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" required>
-                    <input type="password" id="newPw" placeholder="New password" class="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" required>
-                    <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg text-sm transition w-full">Update password</button>
-                    <p id="pwMessage" class="text-sm hidden mt-2"></p>
-                </form>
-                <div class="border-t border-gray-800 pt-4 mt-4">
-                    <button onclick="logout()" class="w-full border border-red-900 text-red-400 hover:bg-red-900 py-2 rounded-lg transition text-sm">Log out</button>
-                </div>
-            </div>
-
-            <!-- VIEW: ADMIN -->
-            <div id="viewAdmin" class="space-y-6 hidden">
-                <div class="bg-black p-4 rounded-lg border border-gray-700 flex justify-between items-center">
-                    <div>
-                        <p class="text-white font-semibold">Open Registration</p>
-                        <p class="text-xs text-gray-400">Allow new users to create accounts</p>
-                    </div>
-                    <button id="toggleSignupBtn" onclick="toggleSignups()" class="px-3 py-1 rounded text-sm font-bold transition"></button>
-                </div>
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-300 mb-2">Registered Users</h3>
-                    <div id="userList" class="space-y-2 max-h-40 overflow-y-auto pr-2"></div>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    <script>
-        const API_URL = '';
-        let currentUser = null;
-
-        // AUTH LOGIC
-        function toggleAuth(mode) {
-            document.getElementById('authMode').value = mode;
-            document.getElementById('authError').classList.add('hidden');
-            if(mode === 'login') {
-                document.getElementById('tabLogin').classList.replace('text-gray-500', 'tab-active');
-                document.getElementById('tabRegister').classList.replace('tab-active', 'text-gray-500');
-                document.getElementById('authBtnText').innerText = 'Log in';
-            } else {
-                document.getElementById('tabRegister').classList.replace('text-gray-500', 'tab-active');
-                document.getElementById('tabLogin').classList.replace('tab-active', 'text-gray-500');
-                document.getElementById('authBtnText').innerText = 'Register';
-            }
-        }
-
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const mode = document.getElementById('authMode').value;
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            const err = document.getElementById('authError');
-
-            try {
-                if(mode === 'register') {
-                    const res = await fetch('/register', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({username: u, password: p, sync_strategy: 'plugin'})
-                    });
-                    if(!res.ok) throw new Error((await res.json()).detail || "Registration error");
-                }
-                
-                // Login regardless
-                const fd = new FormData(); fd.append('username', u); fd.append('password', p);
-                const loginRes = await fetch('/token', { method: 'POST', body: fd });
-                if(!loginRes.ok) throw new Error("Incorrect username or password");
-                
-                localStorage.setItem('obsidian_token', (await loginRes.json()).access_token);
-                document.getElementById('password').value = '';
-                checkAuth();
+                if(!loginRes.ok) throw new Error("Login failed");
+                const data = await loginRes.json();
+                token = data.access_token;
+                localStorage.setItem('vault_token', token);
+                currentUser = u;
+                showDashboard();
             } catch (error) {
-                err.textContent = error.message;
+                err.innerText = error.message;
                 err.classList.remove('hidden');
             }
         });
 
-        function logout() {
-            localStorage.removeItem('obsidian_token');
-            checkAuth();
-        }
-
-        async function checkAuth() {
-            const token = localStorage.getItem('obsidian_token');
-            if (!token) return showAuth();
-
-            try {
-                const res = await fetch('/users/me', { headers: {'Authorization': `Bearer ${token}`} });
-                if (!res.ok) throw new Error("Token expired");
-                currentUser = await res.json();
-                showDashboard();
-            } catch (e) {
-                logout();
-            }
-        }
-
-        function showAuth() {
-            document.getElementById('dashboardSection').classList.add('hidden');
-            document.getElementById('authSection').classList.remove('hidden');
-            document.getElementById('username').value = '';
-        }
-
+        // DASHBOARD LOGIC
         function showDashboard() {
             document.getElementById('authSection').classList.add('hidden');
             document.getElementById('dashboardSection').classList.remove('hidden');
-            document.getElementById('profileName').innerText = currentUser.username;
-            
-            if(currentUser.is_admin) {
-                document.getElementById('navAdmin').classList.remove('hidden');
-                loadAdminData();
-            } else {
-                document.getElementById('navAdmin').classList.add('hidden');
-            }
+            document.getElementById('profileName').innerText = currentUser;
+            document.getElementById('tokenBox').innerText = token;
             switchView('inbox');
+            checkAdmin();
         }
 
-        // TABS LOGIC
         function switchView(view) {
             ['inbox', 'profile', 'admin'].forEach(v => {
                 document.getElementById(`view${v.charAt(0).toUpperCase() + v.slice(1)}`).classList.add('hidden');
-                document.getElementById(`nav${v.charAt(0).toUpperCase() + v.slice(1)}`).classList.replace('tab-active', 'text-gray-500');
+                const nav = document.getElementById(`nav${v.charAt(0).toUpperCase() + v.slice(1)}`);
+                if(nav) nav.classList.replace('tab-active', 'text-gray-500');
             });
             document.getElementById(`view${view.charAt(0).toUpperCase() + view.slice(1)}`).classList.remove('hidden');
-            document.getElementById(`nav${view.charAt(0).toUpperCase() + view.slice(1)}`).classList.replace('text-gray-500', 'tab-active');
+            const activeNav = document.getElementById(`nav${view.charAt(0).toUpperCase() + view.slice(1)}`);
+            if(activeNav) activeNav.classList.replace('text-gray-500', 'tab-active');
         }
 
-        // PASSWORD LOGIC
-        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const token = localStorage.getItem('obsidian_token');
-            const msg = document.getElementById('pwMessage');
-            try {
-                const res = await fetch('/users/me/password', {
-                    method: 'POST',
-                    headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
-                    body: JSON.stringify({old_password: document.getElementById('oldPw').value, new_password: document.getElementById('newPw').value})
-                });
-                const data = await res.json();
-                if(res.ok) {
-                    msg.innerHTML = "Password updated!"; msg.className = "text-sm mt-2 text-green-400 block";
-                    document.getElementById('passwordForm').reset();
-                } else throw new Error(data.detail);
-            } catch (err) {
-                msg.innerHTML = err.message; msg.className = "text-sm mt-2 text-red-400 block";
-            }
-        });
-
-        // INBOX LOGIC
+        // LINK SUBMISSION
         document.getElementById('linkForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const token = localStorage.getItem('obsidian_token');
-            const btn = document.getElementById('submitBtn');
-            const msg = document.getElementById('statusMessage');
-            
-            document.getElementById('btnText').classList.add('hidden');
-            document.getElementById('btnSpinner').classList.remove('hidden');
-            btn.disabled = true; msg.classList.add('hidden');
+            const url = document.getElementById('urlInput').value;
+            const btnText = document.getElementById('btnText');
+            const spinner = document.getElementById('btnSpinner');
+            const status = document.getElementById('statusMessage');
+
+            btnText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            status.classList.add('hidden');
 
             try {
-                const res = await fetch('/process-link', {
+                const res = await fetch('/process', {
                     method: 'POST',
-                    headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url: document.getElementById('urlInput').value })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({url: url, mode: currentMode})
                 });
+
+                if(!res.ok) throw new Error("Processing failed");
                 const data = await res.json();
-                if (res.ok) {
-                    msg.className = "mt-4 p-4 rounded-lg text-sm bg-green-900 text-green-200 block";
-                    msg.innerHTML = `<strong>Success!</strong><br/>"${data.title}" is ready in the inbox.`;
-                    document.getElementById('urlInput').value = '';
-                } else throw new Error(data.detail || 'Error processing URL');
-            } catch (err) {
-                msg.className = "mt-4 p-4 rounded-lg text-sm bg-red-900 text-red-200 block";
-                msg.textContent = err.message;
+                status.innerText = `Success! Saved to: ${data.path || 'vault'}`;
+                status.className = "mt-4 p-4 rounded-lg text-sm bg-green-900/30 text-green-400 border border-green-800";
+                document.getElementById('urlInput').value = '';
+            } catch (error) {
+                status.innerText = error.message;
+                status.className = "mt-4 p-4 rounded-lg text-sm bg-red-900/30 text-red-400 border border-red-800";
             } finally {
-                document.getElementById('btnText').classList.remove('hidden');
-                document.getElementById('btnSpinner').classList.add('hidden');
-                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+                status.classList.remove('hidden');
             }
         });
 
-        // ADMIN LOGIC
-        async function loadAdminData() {
-            const token = localStorage.getItem('obsidian_token');
-            
-            // Fetch settings
-            const setRes = await fetch('/admin/settings');
-            const settings = await setRes.json();
-            const btn = document.getElementById('toggleSignupBtn');
-            if(settings.allow_signups) {
-                btn.textContent = "OPEN"; btn.className = "px-3 py-1 rounded text-sm font-bold bg-green-800 text-green-100 hover:bg-green-700";
-            } else {
-                btn.textContent = "CLOSED"; btn.className = "px-3 py-1 rounded text-sm font-bold bg-red-900 text-red-100 hover:bg-red-800";
+        // PASSWORD CHANGE
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('pwMessage');
+            try {
+                const res = await fetch('/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        old_password: document.getElementById('oldPw').value,
+                        new_password: document.getElementById('newPw').value
+                    })
+                });
+                if(!res.ok) throw new Error("Failed to change password");
+                msg.innerText = "Password updated successfully";
+                msg.className = "text-sm mt-2 text-green-400";
+                document.getElementById('oldPw').value = '';
+                document.getElementById('newPw').value = '';
+            } catch (error) {
+                msg.innerText = error.message;
+                msg.className = "text-sm mt-2 text-red-400";
             }
+            msg.classList.remove('hidden');
+        });
 
-            // Fetch users
-            const userRes = await fetch('/admin/users', {headers: {'Authorization': `Bearer ${token}`}});
-            const users = await userRes.json();
-            const list = document.getElementById('userList');
-            list.innerHTML = users.map(u => `
-                <div class="flex justify-between items-center bg-black p-3 rounded border border-gray-800">
-                    <div>
-                        <span class="text-white">${u.username}</span>
-                        ${u.is_admin ? '<span class="ml-2 text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded">Admin</span>' : ''}
-                    </div>
-                    <span class="text-xs text-gray-500">ID: ${u.id}</span>
-                </div>
-            `).join('');
+        // ADMIN
+        async function checkAdmin() {
+            try {
+                const res = await fetch('/admin/status', {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                if(res.ok) {
+                    document.getElementById('navAdmin').classList.remove('hidden');
+                    loadAdminData();
+                }
+            } catch(e) {}
+        }
+
+        async function loadAdminData() {
+            try {
+                const res = await fetch('/admin/users', {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                if(!res.ok) return;
+                const data = await res.json();
+
+                const btn = document.getElementById('toggleSignupBtn');
+                if(data.signups_open) {
+                    btn.innerText = 'ON';
+                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-green-600 text-white';
+                } else {
+                    btn.innerText = 'OFF';
+                    btn.className = 'px-3 py-1 rounded text-sm font-bold transition bg-gray-600 text-gray-300';
+                }
+
+                const list = document.getElementById('userList');
+                list.innerHTML = (data.users || []).map(u => 
+                    `<div class="flex justify-between text-sm p-2 bg-gray-900 rounded"><span class="text-gray-300">${u}</span></div>`
+                ).join('');
+            } catch(e) {}
         }
 
         async function toggleSignups() {
-            const token = localStorage.getItem('obsidian_token');
-            await fetch('/admin/toggle-signups', {method: 'POST', headers: {'Authorization': `Bearer ${token}`}});
-            loadAdminData();
+            try {
+                await fetch('/admin/toggle-signups', {
+                    method: 'POST',
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                loadAdminData();
+            } catch(e) {}
+        }
+
+        // LOGOUT
+        function logout() {
+            token = null;
+            currentUser = null;
+            localStorage.removeItem('vault_token');
+            document.getElementById('dashboardSection').classList.add('hidden');
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('authError').classList.add('hidden');
         }
 
         // INIT
-        checkAuth();
+        if(token) {
+            currentUser = 'User';
+            showDashboard();
+        } else {
+            document.getElementById('authSection').classList.remove('hidden');
+        }
     </script>
 </body>
 </html>
