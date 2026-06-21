@@ -1,11 +1,37 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_mistralai import ChatMistralAI
+from langchain_community.chat_models import ChatOllama
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import re
 
-async def process_text_with_llm(url: str, title: str, content: str, api_key: str, model_name: str, prompt_template: str, vault_context_data: list, use_multipass: bool = False) -> str:
-    if not api_key or api_key == "missing":
-        return f"---\ntitle: \"{title}\"\nsource: \"{url}\"\n---\n\n# LLM Disabled\nMissing Gemini API key in Obsidian settings.\n\n{content[:500]}..."
+def get_llm(provider: str, model_name: str, api_key: str):
+    """Factory funksjon som returnerer riktig LLM-klient basert på valgt provider."""
+    temperature = 0.3
+
+    if provider == "openai":
+        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key)
+    elif provider == "anthropic":
+        return ChatAnthropic(model=model_name, temperature=temperature, api_key=api_key)
+    elif provider == "mistral":
+        return ChatMistralAI(model=model_name, temperature=temperature, api_key=api_key)
+    elif provider == "kimi":
+        # Kimi (Moonshot AI) bruker OpenAI-kompatibelt API, vi overstyrer bare base_url
+        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key, base_url="https://api.moonshot.cn/v1")
+    elif provider == "ollama":
+        # For Ollama forventer vi at brukeren skriver inn URL-en i API-nøkkel feltet, ellers faller vi tilbake til docker localhost
+        base_url = api_key if api_key and api_key.startswith("http") else "http://host.docker.internal:11434"
+        return ChatOllama(model=model_name, temperature=temperature, base_url=base_url)
+    else:
+        # Standard fallback er Google Gemini
+        return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
+
+async def process_text_with_llm(url: str, title: str, content: str, api_key: str, provider: str, model_name: str, prompt_template: str, vault_context_data: list, use_multipass: bool = False) -> str:
+    # Sikkerhetssjekk: Ollama trenger ikke nødvendigvis en nøkkel, men andre gjør det
+    if provider != "ollama" and (not api_key or api_key == "missing"):
+        return f"---\ntitle: \"{title}\"\nsource: \"{url}\"\n---\n\n# LLM Disabled\nMissing API key in Obsidian settings for {provider}.\n\n{content[:500]}..."
 
     try:
         all_tags = set()
@@ -20,11 +46,8 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
             context_lines.append(f"- {note['path']} [{tags_str}]")
         context_string = "\n".join(context_lines) if context_lines else "No notes."
 
-        llm = ChatGoogleGenerativeAI(
-            model=model_name,
-            temperature=0.3,
-            google_api_key=api_key
-        )
+        # Henter riktig LLM-klient fra fabrikken vår
+        llm = get_llm(provider, model_name, api_key)
 
         classified_tags_text = ""
         if use_multipass:
@@ -79,7 +102,7 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
         1. NEVER use slashes (/) or backslashes (\\) inside [[links]]. This corrupts the user's file system.
         2. NEVER format tags as internal links (e.g., do not write [[#tag]] or [[tag/subtag]]).
         3. Only use exact filenames from the provided context list for [[links]]. Do not invent files.
-        4. TAG FORMATTING: Tags in the YAML frontmatter MUST NEVER contain spaces. Always replace spaces with hyphens (e.g., management-cybernetics). Tags must be lowercase alphanumeric with hyphens only.
+        4. TAG FORMATTING: Tags in the YAML frontmatter MUST NEVER contain spaces. Always replace spaces with hyphens (e.g., management-cybernetics). Tags must be lowercase alphanumeric with hyphens only. No special characters.
         {classified_tags_text}
 
         USER TEMPLATE INSTRUCTIONS:
