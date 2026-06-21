@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add To Vault - Interactive Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: { 
+                    colors: { 
+                        obsidian: { 
+                            800: '#1e1e1e', 
+                            900: '#111111', 
+                            accent: '#7c3aed',
+                            ui: '#242424',
+                            border: '#333333'
+                        } 
+                    } 
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #111111; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
+        .spinner { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid #7c3aed; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Simulated Obsidian Markdown Styles */
+        .obsidian-md h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem; color: #e0e0e0; }
+        .obsidian-md h2 { font-size: 1.4rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #e0e0e0; }
+        .obsidian-md p { margin-bottom: 1rem; line-height: 1.6; color: #a3a3a3; }
+        .obsidian-md ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #a3a3a3; line-height: 1.6; }
+        .obsidian-md .internal-link { color: #a78bfa; text-decoration: none; cursor: pointer; transition: color 0.2s; }
+        .obsidian-md .internal-link:hover { text-decoration: underline; color: #c4b5fd; }
+        .obsidian-md .tag { background: rgba(124, 58, 237, 0.2); color: #c4b5fd; padding: 0.1rem 0.4rem; border-radius: 1rem; font-size: 0.8rem; margin-right: 0.3rem; }
+        .yaml-frontmatter { color: #6b7280; font-family: monospace; font-size: 0.85rem; border-bottom: 1px solid #333; padding-bottom: 1rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="flex h-screen w-full">
+
+    <!-- LEFT PANEL: Dashboard Simulator -->
+    <div class="w-full md:w-1/3 bg-obsidian-900 border-r border-obsidian-border flex flex-col p-8 z-10 shadow-2xl">
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold tracking-tight text-white mb-2">Add To Vault</h1>
+            <p class="text-sm text-gray-500">Interactive Demo. Select a scenario below to see how the LLM processes web content.</p>
+        </div>
+
+        <form id="demoForm" class="space-y-6">
+            <!-- Simulated URL Input (Dropdown) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Select Sample Link</label>
+                <select id="sourceSelect" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-obsidian-accent text-white appearance-none cursor-pointer">
+                    <option value="wiki">Wikipedia: Viable System Model</option>
+                    <option value="reddit">Reddit: 3D Printing Cooling Guide</option>
+                    <option value="news">TechCrunch: New AI Model Released</option>
+                </select>
+            </div>
+
+            <!-- Mode Selector -->
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Processing Mode</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" id="mode-archivist" onclick="setMode('archivist')" class="mode-btn border border-gray-700 text-gray-400 hover:border-gray-500 py-2 rounded-lg text-sm transition">Archivist</button>
+                    <button type="button" id="mode-analyst" onclick="setMode('analyst')" class="mode-btn border border-obsidian-accent text-purple-400 bg-purple-900/20 py-2 rounded-lg text-sm transition">Analyst</button>
+                    <button type="button" id="mode-synthesist" onclick="setMode('synthesist')" class="mode-btn border border-gray-700 text-gray-400 hover:border-gray-500 py-2 rounded-lg text-sm transition">Synthesist</button>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="submitBtn" class="w-full bg-obsidian-accent hover:bg-purple-600 text-white font-semibold py-3 px-4 rounded-lg flex justify-center items-center transition duration-200">
+                <span id="btnText">Simulate Processing</span>
+                <div id="btnSpinner" class="spinner hidden"></div>
+            </button>
+        </form>
+
+        <div id="statusMessage" class="mt-4 p-4 rounded-lg hidden text-sm"></div>
+    </div>
+
+    <!-- RIGHT PANEL: Obsidian Simulator -->
+    <div class="hidden md:flex w-2/3 bg-obsidian-800 flex-col relative">
+        
+        <!-- Obsidian Top Bar (Breadcrumbs) -->
+        <div class="h-10 border-b border-obsidian-border bg-obsidian-ui flex items-center px-4 text-xs text-gray-500 select-none">
+            <span class="mr-2">📚 Vault</span> <span class="mx-1">&gt;</span> 
+            <span class="mr-2">📥 Inbox</span> <span class="mx-1">&gt;</span> 
+            <span id="obsidianFilename" class="font-semibold text-gray-300">welcome.md</span>
+        </div>
+
+        <!-- Obsidian Editor Area -->
+        <div class="flex-1 overflow-y-auto p-12 relative">
+            
+            <!-- Default Welcome Screen -->
+            <div id="welcomeScreen" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 select-none">
+                <svg xmlns="http://www.w3.org/2005/svg" class="h-16 w-16 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p>Select a scenario and click process</p>
+                <p class="text-sm mt-1">The result will appear here in your simulated vault.</p>
+            </div>
+
+            <!-- Markdown Render Area -->
+            <div id="obsidianContent" class="obsidian-md hidden max-w-3xl mx-auto w-full">
+                <!-- Content injected via JS -->
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'analyst';
+
+        // --- MOCK DATA (Generated by Kimi) ---
+        const mockData = {
+            // ============================================
+            // WIKIPEDIA: Viable System Model
+            // ============================================
+            
+            "wiki_analyst": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "Viable System Model - Wikipedia"<br>
+                    source: "https://en.wikipedia.org/wiki/Viable_system_model"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, analyst, auto-generated, management-cybernetics, systems-theory]<br>
+                    ---
+                </div>
+                <h1>Viable System Model - Wikipedia</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#analyst</span> <span class="tag">#management-cybernetics</span></p>
+                <h2>Summary</h2>
+                <p>The Viable System Model (VSM) is a conceptual tool developed by Stafford Beer to understand how autonomous systems survive and adapt in changing environments. It models organizational structure based on the human nervous system, divided into five interacting subsystems. It heavily utilizes concepts from <span class="internal-link">[[management-cybernetics]]</span> and <span class="internal-link">[[systems-theory]]</span>.</p>
+                <h2>Key Takeaways</h2>
+                <ul>
+                    <li>VSM provides a framework for analyzing the viability of any organization or system.</li>
+                    <li>It consists of 5 systems: Operations, Coordination, Control, Intelligence, and Policy.</li>
+                    <li>It emphasizes autonomy at local levels while maintaining cohesion at the top.</li>
+                    <li>Recursion is a core principle—each viable system contains smaller viable systems within it.</li>
+                </ul>
+            `,
+
+            "wiki_archivist": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "Viable System Model - Wikipedia"<br>
+                    source: "https://en.wikipedia.org/wiki/Viable_system_model"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, archivist, auto-generated, systems-theory, management-cybernetics]<br>
+                    ---
+                </div>
+                <h1>Viable System Model</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#archivist</span> <span class="tag">#systems-theory</span></p>
+                <h2>Overview</h2>
+                <p>The viable system model (VSM) is a model of the organisational structure of any autonomous system capable of producing itself. It was developed in the 1950s and 1960s by <span class="internal-link">[[Stafford Beer]]</span>, a British operations research theorist and cybernetician. The model is based on the premise that an enterprise, or a system, is viable if it has the means, the structure, and the capacity to adapt and survive in a changing environment.</p>
+                <h2>History</h2>
+                <p>Stafford Beer developed the VSM while working at <span class="internal-link">[[United Steel]]</span> and later refined it during his consultancy work in Chile with the <span class="internal-link">[[Cybersyn]]</span> project under Salvador Allende's government. The model was intended to help manage the complexity of large organisations by applying principles derived from <span class="internal-link">[[cybernetics]]</span> and the study of the human nervous system.</p>
+                <h2>The Five Systems</h2>
+                <p>The VSM identifies five necessary and sufficient subsystems for any viable system:</p>
+                <ul>
+                    <li><strong>System One (S1):</strong> The primary activities of the organisation—those that produce the products or services.</li>
+                    <li><strong>System Two (S2):</strong> The coordination mechanisms that ensure the primary activities do not conflict with one another.</li>
+                    <li><strong>System Three (S3):</strong> The control and audit functions that monitor the internal environment and ensure compliance with organisational policy.</li>
+                    <li><strong>System Four (S4):</strong> The intelligence function that scans the external environment and plans for future adaptation.</li>
+                    <li><strong>System Five (S5):</strong> The policy function that balances the demands of the present (System Three) with the demands of the future (System Four).</li>
+                </ul>
+                <h2>Recursion</h2>
+                <p>A key concept in the VSM is recursion. Each viable system at one level of recursion contains within it viable systems at the next lower level. For example, a corporation is a viable system, and each of its divisions is also a viable system, as is each department within a division, and so on. This recursive structure allows the model to be applied at any scale.</p>
+                <h2>Applications</h2>
+                <p>The VSM has been applied in various domains including government, healthcare, education, and corporate management. It is particularly valued for its ability to diagnose organisational pathologies and design structures that maintain viability under conditions of complexity and rapid change.</p>
+            `,
+
+            "wiki_synthesist": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "Viable System Model - Wikipedia"<br>
+                    source: "https://en.wikipedia.org/wiki/Viable_system_model"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, synthesist, auto-generated, systems-theory]<br>
+                    ---
+                </div>
+                <h1>Viable System Model - Wikipedia</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#synthesist</span> <span class="tag">#systems-theory</span></p>
+                <p>Stafford Beer's VSM defines five recursive subsystems (Operations, Coordination, Control, Intelligence, Policy) that any organisation needs to remain viable in a changing environment. The model treats organisations as <span class="internal-link">[[cybernetic]]</span> systems analogous to the human nervous system.</p>
+                <h2>Core Concepts</h2>
+                <ul>
+                    <li>Viability requires 5 interacting subsystems operating in recursive layers.</li>
+                    <li>Autonomy at the operational level must coexist with cohesion at the policy level.</li>
+                    <li>System Four (Intelligence) must counterbalance System Three (Control) to prevent organisational obsolescence.</li>
+                </ul>
+            `,
+
+            // ============================================
+            // REDDIT: 3D Printing Cooling Guide
+            // ============================================
+            
+            "reddit_analyst": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "3D Printing Cooling and Layer Times Guide - Reddit"<br>
+                    source: "https://reddit.com/r/3Dprinting/comments/xyz123/cooling_guide"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, analyst, auto-generated, 3d-printing, slicer-settings]<br>
+                    ---
+                </div>
+                <h1>3D Printing Cooling and Layer Times Guide</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#analyst</span> <span class="tag">#3d-printing</span></p>
+                <h2>Summary</h2>
+                <p>This Reddit post explains how to optimise cooling settings in <span class="internal-link">[[Cura]]</span> and <span class="internal-link">[[PrusaSlicer]]</span> to prevent warping, stringing, and layer separation. The author emphasises that cooling is not a one-size-fits-all setting and must be tuned per material and geometry.</p>
+                <h2>Key Takeaways</h2>
+                <ul>
+                    <li>PLA benefits from 100% fan speed after the first few layers; PETG and ABS require minimal or no cooling to prevent layer adhesion failure.</li>
+                    <li>Minimum layer time (often 5–10 seconds) forces the printer to slow down on small features, giving them time to cool before the next layer.</li>
+                    <li>Using a <span class="internal-link">[[brim]]</span> or <span class="internal-link">[[raft]]</span> improves bed adhesion, which indirectly reduces cooling-related warping.</li>
+                    <li>Enclosures are essential for high-temperature filaments like ABS and Nylon to maintain ambient temperature and prevent drafts.</li>
+                </ul>
+            `,
+
+            "reddit_archivist": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "3D Printing Cooling and Layer Times Guide - Reddit"<br>
+                    source: "https://reddit.com/r/3Dprinting/comments/xyz123/cooling_guide"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, archivist, auto-generated, 3d-printing, slicer-settings]<br>
+                    ---
+                </div>
+                <h1>3D Printing Cooling and Layer Times Guide</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#archivist</span> <span class="tag">#3d-printing</span></p>
+                <h2>Original Post</h2>
+                <p>Posted by u/PrintMaster_42 in <span class="internal-link">[[r/3Dprinting]]</span></p>
+                <p>Hey everyone, I've been printing for about 3 years now and I wanted to share what I've learned about cooling settings because I see a lot of people struggling with the same issues. Cooling is probably the most misunderstood setting in slicers and getting it wrong can ruin an otherwise perfect print.</p>
+                <p>First, let's talk about PLA. PLA loves cooling. You want your part cooling fan at 100% after layer 3 or 4. If you turn it on too early, the first layers might not stick to the bed properly. But once you're past the initial layers, blast it. PLA starts sagging and losing detail if it doesn't cool fast enough, especially on overhangs and bridges.</p>
+                <p>PETG is the opposite. PETG needs almost no cooling. I run my fan at 30% max, sometimes even 0% for the first 10 layers. Too much cooling with PETG and you'll get terrible layer adhesion. Your parts will snap along the layer lines like they're not even fused together. I've ruined functional parts this way.</p>
+                <p>ABS and Nylon? Forget the fan entirely unless you have an enclosure. Actually, even with an enclosure, I keep ABS fan at 0%. The whole point of ABS is that it stays hot and layers fuse chemically. If you cool it too fast, you get warping and cracking. Enclosure temperature should be around 40–50°C for ABS.</p>
+                <h2>Layer Time Settings</h2>
+                <p>Minimum layer time is something a lot of beginners ignore. If you're printing something tiny, like a calibration cube or a small figurine, each layer takes like 2 seconds to print. That's not enough time for the plastic to solidify before the next layer gets laid on top. The result? A melted blob.</p>
+                <p>Set your minimum layer time to at least 5 seconds. Some people go up to 10 seconds for really detailed prints. The slicer will automatically slow down the print speed on those small layers to hit that time target. You can also use the "lift head" option, but I find that causes more stringing than it's worth.</p>
+                <h2>Comments</h2>
+                <p><strong>u/TechNerd_88:</strong> Great guide! One thing I'd add is that fan duct design matters a lot. The stock <span class="internal-link">[[Ender 3]]</span> fan shroud is terrible. Printing a <span class="internal-link">[[Petsfang]]</span> or <span class="internal-link">[[Hero Me]]</span> duct made a bigger difference for me than any slicer setting.</p>
+                <p><strong>u/PrintMaster_42 (OP):</strong> Absolutely agree. Stock cooling is barely adequate. A good duct directs air exactly where it needs to go instead of blowing vaguely in the direction of the nozzle.</p>
+            `,
+
+            "reddit_synthesist": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "3D Printing Cooling and Layer Times Guide - Reddit"<br>
+                    source: "https://reddit.com/r/3Dprinting/comments/xyz123/cooling_guide"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, synthesist, auto-generated, 3d-printing]<br>
+                    ---
+                </div>
+                <h1>3D Printing Cooling and Layer Times Guide</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#synthesist</span> <span class="tag">#3d-printing</span></p>
+                <p>Cooling requirements are material-specific: PLA needs maximum fan speed after layer 3, while <span class="internal-link">[[PETG]]</span> and <span class="internal-link">[[ABS]]</span> require minimal or zero cooling to preserve layer adhesion. Minimum layer time (5–10s) prevents small features from melting into blobs by forcing the printer to slow down.</p>
+                <h2>Core Concepts</h2>
+                <ul>
+                    <li>PLA: 100% fan after initial layers; PETG/ABS: ≤30% fan or none.</li>
+                    <li>High-temp filaments require an enclosure to prevent warping from ambient drafts.</li>
+                    <li>Aftermarket fan ducts outperform stock cooling hardware.</li>
+                </ul>
+            `,
+
+            // ============================================
+            // TECHCRUNCH: New AI Model Released
+            // ============================================
+            
+            "news_analyst": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "OpenAI Unveils GPT-5 with Multimodal Reasoning - TechCrunch"<br>
+                    source: "https://techcrunch.com/2026/06/20/openai-gpt5-multimodal-reasoning"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, analyst, auto-generated, ai, openai, gpt-5, multimodal]<br>
+                    ---
+                </div>
+                <h1>OpenAI Unveils GPT-5 with Multimodal Reasoning</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#analyst</span> <span class="tag">#ai</span> <span class="tag">#openai</span></p>
+                <h2>Summary</h2>
+                <p>OpenAI has announced <span class="internal-link">[[GPT-5]]</span>, its next-generation large language model featuring native multimodal reasoning across text, images, audio, and video. The model demonstrates significant improvements in <span class="internal-link">[[chain-of-thought]]</span> reasoning, mathematical problem-solving, and long-context coherence up to 2 million tokens. OpenAI claims GPT-5 achieves human-level performance on several professional benchmarks including the BAR exam and medical licensing tests.</p>
+                <h2>Key Takeaways</h2>
+                <ul>
+                    <li>GPT-5 supports native multimodal input and output, eliminating the need for separate vision or speech models.</li>
+                    <li>Context window expanded to 2 million tokens, enabling analysis of entire codebases and long-form video content.</li>
+                    <li>OpenAI introduced a new "Constitutional Reasoning" safety layer designed to reduce hallucinations and adversarial jailbreaks.</li>
+                    <li>Pricing remains unchanged for API consumers, but ChatGPT Plus subscribers gain priority access to multimodal features.</li>
+                </ul>
+            `,
+
+            "news_archivist": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "OpenAI Unveils GPT-5 with Multimodal Reasoning - TechCrunch"<br>
+                    source: "https://techcrunch.com/2026/06/20/openai-gpt5-multimodal-reasoning"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, archivist, auto-generated, ai, openai, gpt-5, multimodal, llm]<br>
+                    ---
+                </div>
+                <h1>OpenAI Unveils GPT-5 with Multimodal Reasoning</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#archivist</span> <span class="tag">#ai</span> <span class="tag">#openai</span></p>
+                <h2>Article Body</h2>
+                <p>By <span class="internal-link">[[Kyle Wiggers]]</span> | TechCrunch | June 20, 2026</p>
+                <p>OpenAI has officially unveiled GPT-5, the successor to its widely adopted GPT-4 family of models, marking what the company describes as a "step change" in artificial general intelligence capabilities. The announcement, made during OpenAI's annual developer conference in San Francisco, positions GPT-5 as the first model to achieve "native multimodal reasoning"—the ability to reason seamlessly across text, images, audio, and video without relying on separate, stitched-together systems.</p>
+                <p>"Previous models treated multimodality as a pipeline," said <span class="internal-link">[[Sam Altman]]</span>, OpenAI's CEO, during the keynote. "GPT-5 thinks in concepts that happen to be expressed in different modalities. The modality is just the surface."</p>
+                <h2>Technical Specifications</h2>
+                <p>The model features a context window of 2 million tokens, doubling the previous maximum available through GPT-4 Turbo. OpenAI engineers demonstrated the capability by uploading an entire 800-page legal brief and asking GPT-5 to identify inconsistencies in witness testimony—a task that previously required chunking the document across multiple prompts.</p>
+                <p>Benchmark results shared by OpenAI show GPT-5 scoring in the 99th percentile on the <span class="internal-link">[[AMC 12]]</span> mathematics competition, passing the <span class="internal-link">[[USMLE]]</span> Step 1 medical licensing exam with a score of 285/300, and achieving a 94% accuracy rate on the <span class="internal-link">[[SWE-bench]]</span> software engineering benchmark.</p>
+                <h2>Safety and Alignment</h2>
+                <p>OpenAI highlighted a new architecture component called "Constitutional Reasoning," which embeds safety constraints directly into the model's reasoning chain rather than applying them as a post-hoc filter. The company claims this reduces "jailbreak" success rates by 87% compared to GPT-4 while maintaining utility on benign tasks.</p>
+                <p>However, critics remain sceptical. <span class="internal-link">[[Dr. Margaret Mitchell]]</span>, chief ethics scientist at <span class="internal-link">[[Hugging Face]]</span>, noted that "benchmarks are not behaviour" and urged independent red-teaming before widespread deployment.</p>
+                <h2>Availability and Pricing</h2>
+                <p>GPT-5 is available immediately via OpenAI's API at the same price points as GPT-4 Turbo: $0.03 per 1K input tokens and $0.06 per 1K output tokens. ChatGPT Plus subscribers will receive priority access to multimodal features, while free-tier users will interact with a distilled version called GPT-5-mini.</p>
+                <p>Enterprise customers can opt for a dedicated "GPT-5 Enterprise" tier with guaranteed uptime, custom fine-tuning, and audit logging compliant with <span class="internal-link">[[SOC 2]]</span> and <span class="internal-link">[[GDPR]]</span> requirements.</p>
+            `,
+
+            "news_synthesist": `
+                <div class="yaml-frontmatter">
+                    ---<br>
+                    title: "OpenAI Unveils GPT-5 with Multimodal Reasoning - TechCrunch"<br>
+                    source: "https://techcrunch.com/2026/06/20/openai-gpt5-multimodal-reasoning"<br>
+                    date: "2026-06-21"<br>
+                    tags: [inbox, synthesist, auto-generated, ai, openai]<br>
+                    ---
+                </div>
+                <h1>OpenAI Unveils GPT-5 with Multimodal Reasoning</h1>
+                <p><span class="tag">#inbox</span> <span class="tag">#synthesist</span> <span class="tag">#ai</span></p>
+                <p>OpenAI's <span class="internal-link">[[GPT-5]]</span> introduces native multimodal reasoning across text, image, audio, and video with a 2-million-token context window and a new "Constitutional Reasoning" safety architecture. API pricing is unchanged; Plus subscribers get priority multimodal access.</p>
+                <h2>Core Concepts</h2>
+                <ul>
+                    <li>Native multimodal reasoning replaces pipelined vision/speech models.</li>
+                    <li>2M-token context enables whole-codebase and long-video analysis.</li>
+                    <li>Constitutional Reasoning embeds safety constraints into the reasoning chain, reducing jailbreaks by 87%.</li>
+                </ul>
+            `
+        };
+
+        // --- UI LOGIC ---
+        function setMode(mode) {
+            currentMode = mode;
+            ['archivist', 'analyst', 'synthesist'].forEach(m => {
+                const btn = document.getElementById(`mode-${m}`);
+                btn.className = "mode-btn border border-gray-700 text-gray-400 hover:border-gray-500 py-2 rounded-lg text-sm transition";
+            });
+            const activeBtn = document.getElementById(`mode-${mode}`);
+            activeBtn.className = "mode-btn border border-obsidian-accent text-purple-400 bg-purple-900/20 py-2 rounded-lg text-sm transition";
+        }
+
+        document.getElementById('demoForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const source = document.getElementById('sourceSelect').value;
+            const btnText = document.getElementById('btnText');
+            const spinner = document.getElementById('btnSpinner');
+            const status = document.getElementById('statusMessage');
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            const contentArea = document.getElementById('obsidianContent');
+
+            // 1. Set Loading State
+            btnText.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            status.classList.add('hidden');
+            document.getElementById('submitBtn').disabled = true;
+
+            // 2. Simulate Network & LLM Delay (3 seconds)
+            setTimeout(() => {
+                // Restore Button State
+                btnText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+                document.getElementById('submitBtn').disabled = false;
+
+                // Show Success Message
+                status.innerHTML = `<strong>Simulated Success!</strong><br/>Note processed and added to your vault.`;
+                status.className = "mt-4 p-4 rounded-lg text-sm bg-green-900/30 text-green-400 border border-green-800 block";
+
+                // Hide Welcome, Show Content
+                welcomeScreen.classList.add('hidden');
+                
+                // Lookup Mock Data
+                const dataKey = `${source}_${currentMode}`;
+                const content = mockData[dataKey] || `<h1>Data missing for ${dataKey}</h1><p>Kimi needs to generate this!</p>`;
+                
+                contentArea.innerHTML = content;
+                contentArea.classList.remove('hidden');
+
+                // Update Fake Filename
+                const sourceNames = { 'wiki': 'Viable System Model', 'reddit': 'Cooling Guide', 'news': 'AI Tech News' };
+                document.getElementById('obsidianFilename').innerText = `${sourceNames[source].replace(/ /g, '-')}.md`;
+
+            }, 2500); // 2.5 second delay for dramatic effect
+        });
+
+        // Initialize default UI state
+        setMode('analyst');
+    </script>
+</body>
+</html>
