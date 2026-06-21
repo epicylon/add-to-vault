@@ -1,4 +1,294 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add To Vault</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --container-bg: #1e1e1e;
+            --accent-color: #8b5cf6;
+            --text-color: #e0e0e0;
+            --input-bg: #2d2d2d;
+            --success-color: #10b981;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: var(--container-bg);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 450px;
+        }
+
+        h1 { text-align: center; margin-bottom: 1.5rem; }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #333;
+            padding-bottom: 0.5rem;
+        }
+
+        .tab {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            color: #888;
+        }
+
+        .tab.active {
+            color: var(--accent-color);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .view { display: none; }
+        .view.active { display: block; }
+
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #888; font-size: 0.9rem; }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--input-bg);
+            border: 1px solid #333;
+            border-radius: 0.5rem;
+            color: white;
+            box-sizing: border-box;
+        }
+
+        /* --- MODE SELECTOR STYLES --- */
+        .mode-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .mode-btn {
+            background: var(--input-bg);
+            border: 1px solid #333;
+            padding: 0.6rem;
+            border-radius: 0.5rem;
+            color: #888;
+            cursor: pointer;
+            font-size: 0.8rem;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        button.primary {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+        }
+
+        .message.success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); border: 1px solid var(--success-color); display: block; }
+
+        /* --- PROFILE STYLES --- */
+        .token-display {
+            background: #000;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            word-break: break-all;
+            margin-top: 0.5rem;
+            position: relative;
+            font-size: 0.85rem;
+            border: 1px solid #333;
+        }
+
+        .blurred { filter: blur(5px); user-select: none; }
+        .reveal-btn {
+            margin-top: 0.5rem;
+            background: none;
+            border: 1px solid #444;
+            color: #888;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.3rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="auth-container">
+        <h1>Welcome</h1>
+        <div class="input-group">
+            <input type="text" id="username" placeholder="Username">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" placeholder="Password">
+        </div>
+        <button class="primary" onclick="login()">Login / Register</button>
+    </div>
+
+    <div class="container" id="main-container" style="display:none;">
+        <h1>Add To Vault</h1>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('inbox')">Inbox</div>
+            <div class="tab" onclick="switchTab('profile')">Profile</div>
+        </div>
+
+        <div id="inbox-view" class="view active">
+            <div class="input-group">
+                <input type="text" id="url-input" placeholder="Paste URL...">
+            </div>
+            
+            <label>Processing Mode</label>
+            <div class="mode-selector">
+                <div class="mode-btn" onclick="setMode('archivist')" id="mode-archivist">Archivist</div>
+                <div class="mode-btn active" onclick="setMode('analyst')" id="mode-analyst">Analyst</div>
+                <div class="mode-btn" onclick="setMode('synthesist')" id="mode-synthesist">Synthesist</div>
+            </div>
+
+            <button class="primary" id="process-btn" onclick="processLink()">Process & Save</button>
+            <div id="status-message" class="message"></div>
+        </div>
+
+        <div id="profile-view" class="view">
+            <p>Logged in as: <strong id="user-display"></strong></p>
+            <label>Your Bearer Token (for Obsidian)</label>
+            <div id="token-box" class="token-display blurred">Loading...</div>
+            <button class="reveal-btn" onclick="toggleToken()">Show / Hide Token</button>
+            <br><br>
+            <button class="primary" style="background:#ef4444;" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'analyst';
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`mode-${mode}`).classList.add('active');
+        }
+
+        async function login() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            
+            // Try register first
+            try {
+                await fetch('/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: u, password: p})
+                });
+            } catch(e) {}
+
+            const resp = await fetch('/token', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `username=${u}&password=${p}`
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('username', u);
+                showMain();
+            } else {
+                alert('Login failed');
+            }
+        }
+
+        function showMain() {
+            document.getElementById('auth-container').style.display = 'none';
+            document.getElementById('main-container').style.display = 'block';
+            document.getElementById('user-display').innerText = localStorage.getItem('username');
+            document.getElementById('token-box').innerText = localStorage.getItem('access_token');
+        }
+
+        function toggleToken() {
+            const box = document.getElementById('token-box');
+            box.classList.toggle('blurred');
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(`${tab}-view`).classList.add('active');
+        }
+
+        async function processLink() {
+            const url = document.getElementById('url-input').value;
+            const btn = document.getElementById('process-btn');
+            const msg = document.getElementById('status-message');
+            
+            if(!url) return;
+            
+            btn.disabled = true;
+            btn.innerText = 'Processing...';
+            msg.className = 'message';
+
+            const resp = await fetch('/process-link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({ url: url, mode: currentMode })
+            });
+
+            const data = await resp.json();
+            btn.disabled = false;
+            btn.innerText = 'Process & Save';
+
+            if (resp.ok) {
+                msg.innerHTML = `Success!<br>"${data.title}" is ready in the inbox.`;
+                msg.className = 'message success';
+                document.getElementById('url-input').value = '';
+            } else {
+                alert('Error: ' + data.detail);
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        if (localStorage.getItem('access_token')) showMain();
+    </script>
+</body>
+</html><!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
