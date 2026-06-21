@@ -93,7 +93,7 @@ def scrape_url(url: str):
 
     # --- JINA READER HANDLER ---
     if is_difficult:
-        # Tweak for Reddit: Forsøk å bruke old.reddit.com for å omgå moderne Cloudflare-sjekker
+        # Try old.reddit.com to bypass Cloudflare-checks
         if "reddit.com" in url:
             url = url.replace("www.reddit.com", "old.reddit.com")
 
@@ -104,7 +104,7 @@ def scrape_url(url: str):
             
             text = response.text
 
-            # Sjekk om Jina returnerte en "soft error" (vellykket forespørsel, men blokkert av målet)
+            # Check if Jina returned "soft error" (successful request, but blocked by target)
             if "Target URL returned error" in text or "You've been blocked by network security" in text:
                 return "Scraping Blocked", f"The target website actively blocked the scraping attempt. \n\n**Raw output:**\n{text[:300]}"
             
