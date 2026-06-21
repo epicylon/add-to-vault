@@ -6,81 +6,69 @@ A lightweight and modular service for adding articles, comments & finds to your 
 ![alt text](https://raw.githubusercontent.com/epicylon/add-to-vault/refs/heads/demo/scr/atv-screenshot-1.png "Add To Vault Overview")
 
 ### Overview
+**Add To Vault** is a two-part system designed to capture, summarize, and link web content securely. While the backend server handles the heavy lifting (web scraping and LLM processing), this plugin sits quietly in your Obsidian vault and acts as the secure courier.
 
-**Add To Vault** is a self-hosted backend and web interface designed to bridge the gap between your web browser and your Obsidian vault. Instead of manually copying text or relying on heavy third-party sync services, you paste a URL into the web dashboard. The server scrapes the content, uses an LLM (Google Gemini) to summarize and format it into Markdown, and holds it in a secure inbox until your Obsidian client pulls it down.
+It performs two main tasks:
 
-**Crucially, *it is context-aware***. The companion Obsidian plugin sends a list of your existing vault note titles to the server, allowing the LLM to automatically generate internal ```[[links]]``` to concepts you already have notes on.
+1. **Pushing Context:** It reads the filenames in your vault and securely pushes this index to your server. This allows the server's LLM to generate intelligent [[internal links]] to concepts you already know.
+
+2. **Pulling Notes:** It periodically polls your server's secure inbox for newly generated markdown files, downloads them directly into your vault, and deletes them from the server.
 
 <div align="center">
   <h3><a href="https://epicylon.github.io/add-to-vault/">Try out a demo simulation here</a></h3>
 </div>
 
-### Features
-
-- **Smart Web Scraping:** Automatically extracts clean, readable text from articles while stripping out ads and navigation.
-
-- **LLM Summarization:** Leverages Google Gemini (flash models recommended) to summarize content, extract key points, and generate tags.
-
-- **Context-Aware Linking:** Knows your existing vault structure (file names only) and weaves relevant internal links into the generated summaries.
-
-- **Customizable Templates:** Write your own prompt template directly inside Obsidian. The server follows your local Markdown structure.
-
-- **Privacy-Focused Sync:** No need to expose your entire vault to Syncthing or cloud providers. The server only sees your file names, and generated files are deleted from the server the moment your local Obsidian client downloads them.
-
-- **Admin Dashboard:** Includes a minimalist web UI with user authentication and the ability to close public registrations.
-
 ### Prerequisites
+- An active, self-hosted instance of the Add To Vault Server. (Update link when ready)
 
-- Docker and Docker Compose installed on your host machine/server.
+- A generated Bearer Token (found in your server's web dashboard under the "Profile" tab).
 
-- A Google Gemini API key (Free tier from Google AI Studio works perfectly).
+- A Google Gemini API Key.
 
-### Installation
+### Manual Installation
 
-1. Clone this repository to your server:
-```
-git clone [https://github.com/epicylon/add-to-vault.git](https://github.com/epicylon/add-to-vault.git)
-cd add-to-vault-server
-```
+Until this plugin is available in the official Obsidian Community Plugins directory, you can install it manually:
 
-2. Start the Docker container:
-```
-docker-compose up -d --build
-```
+1. Download the latest ```main.js``` and ```manifest.json``` files from the Releases tab *(or build them from source)*.
 
-3. Access the web interface by navigating to ```http://<your-server-ip>:8000``` in your browser.
+2. Open your Obsidian vault folder.
 
-### Initial Setup
+3. Navigate to ```.obsidian/plugins/```.
 
-1. **Create the Admin Account:** The very first user to register an account on the web interface is automatically granted Administrator privileges.
+4. Create a new folder named ```add-to-vault```.
 
-2. **Lock Registrations:** Once logged in, go to the "Admin" tab and toggle Open Registration to "CLOSED" to prevent unauthorized users from using your server.
+5. Place ```main.js``` and ```manifest.json``` inside this new folder.
 
-3. **Generate a Token:** You will use the login credentials (specifically the Bearer token managed under the hood) to connect your Obsidian vault.
+6. Restart Obsidian, go to Settings -> Community Plugins, disable Safe Mode, and enable "Add To Vault".
 
-   (need more on how to obtain bearer token)
+### Configuration & Authentication
+Navigate to the Add To Vault settings tab inside Obsidian to configure the connection:
 
-### Obsidian Plugin
+1. **Create an Account:** Visit your self-hosted server's web dashboard and register for an account.
 
-To complete the setup, you must install the companion Obsidian plugin. This plugin handles the secure push/pull mechanism between your local vault and the server.
+2. **Get Your Token:** Once logged in, navigate to the Profile tab in the dashboard and click "Show / Hide Token". Copy this Bearer Token.
 
-[Link to Add To Vault Obsidian Plugin repository] (Update this link when the plugin repository is public)
+3. **Obsidian Setup:** Paste the token into the "Server API Token" field in the plugin settings. Set your API URL (e.g., http://192.168.1.100:8000).
 
-#### Plugin Configuration
+#### Other Settings:
 
-Once the plugin is installed in Obsidian, go to its settings:
+- **Gemini API Key:** Your Google AI Studio key. (Note: This is securely transmitted and stored on your own server).
 
-1. Enter your Server API URL (e.g., ```http://<your-server-ip>:8000```).
+- **LLM Model:** Select your preferred model (e.g., gemini-2.5-flash).
 
-2. Enter your Server API Token (copied from the web dashboard network requests, or managed via the plugin auth flow).
+- **Inbox Folder:** The local folder where new notes should be saved.
 
-3. Input your Gemini API Key and validate it.
+- **LLM Prompt Templates:** Point to local .md files for Archivist, Analyst, and Synthesist modes. Variables supported: {title}, {url}, {content}, {vault_context}.
 
-4. Select your preferred LLM model.
+### Development
 
-5. Point the plugin to a local .md file in your vault to act as the prompt template (Available variables: ```{title}```, ```{url}```, ```{content}```, ```{vault_context}```).
+To build this plugin from source:
 
-6. Click **"Sync"** to push your preferences and vault context to the server.
+1. Clone this repository.
+
+2. Run ```npm install``` to install dependencies.
+
+3. Run ```npm run build``` to compile the TypeScript source code into the final ```main.js``` file.
 
 ### Architecture
 
