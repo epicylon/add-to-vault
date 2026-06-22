@@ -6,6 +6,7 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=production
+      - JWT_SECRET_KEY=change_this_to_a_long_random_string_before_running
     volumes:
       # Application code (useful for hot-reloading in development)
       - ./backend/app:/app/app
