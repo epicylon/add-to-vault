@@ -13,7 +13,7 @@ from datetime import timedelta
 from . import models, schemas, auth
 from .database import engine, get_db
 from .scraper import scrape_url
-from .llm import process_text_with_llm
+from .llm import process_text_with_llm, _validate_links
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -182,7 +182,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         with open(prefs_file, "r", encoding="utf-8") as f:
             prefs = json.load(f)
 
-        # Fetch vault context (filename & tags)
+        # Hent hvelvkontekst (filnavn og tags)
         vault_context_list = []
         index_file = os.path.join(DATA_DIR, f"vault_index_{current_user.username}.json")
         if os.path.exists(index_file):
@@ -195,7 +195,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
                     else:
                         vault_context_list.append(item)
 
-        # Scrape from URL
+        # Skrap innholdet fra URL
         title, content = await run_in_threadpool(scrape_url, request.url)
         if not content:
             raise HTTPException(status_code=400, detail="Could not find content at the provided link.")
@@ -207,7 +207,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         if not prompt_template:
             raise HTTPException(status_code=400, detail=f"Missing template for mode: {mode}. Please configure it in Obsidian and sync.")
 
-        # Generate note
+        # Generer notat ved hjelp av det oppdaterte LLM-maskineriet
         markdown_result = await process_text_with_llm(
             url=request.url,
             title=title,
@@ -219,6 +219,9 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
             vault_context_data=vault_context_list,
             use_multipass=prefs.get("use_multipass", False)
         )
+
+        # Strip hallucinated [[links]] against the synced vault index
+        markdown_result = _validate_links(markdown_result, vault_context_list)
 
         title_with_dash = title.replace("|", "-")
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title_with_dash)
