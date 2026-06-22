@@ -47,13 +47,17 @@ The self-hosted backend engine for the ***Add To Vault** ecosystem*. This server
 
 1. Clone the repository:
 
-```git clone [https://github.com/epicylon/add-to-vault.git](https://github.com/epicylon/add-to-vault.git)```
+   ```git clone https://github.com/epicylon/add-to-vault.git```
 
-```cd add-to-vault```
+   ```cd add-to-vault```
 
-2. Start the server with Docker Compose:
+2. Replace placeholder
+   
+   ```JWT_SECRET_KEY=change_this_to_a_long_random_string_before_running``` with a strong secret (e.g., ```openssl rand -hex 32```)
 
-```docker-compose up -d --build```
+4. Start the server with Docker Compose:
+
+   ```docker-compose up -d --build```
 
 *This will build the Python image, install dependencies, and start the Uvicorn server on ```port 8000```.*
 
