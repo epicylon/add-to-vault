@@ -1,5 +1,5 @@
 # Add To Vault
-The self-hosted backend engine for the ***Add To Vault ecosystem***. This server handles web scraping, LLM processing, and secure API communication with your Obsidian vault.
+The self-hosted backend engine for the ***Add To Vault* ecosystem**. This server handles web scraping, LLM processing, and secure API communication with your Obsidian vault.
 
 **Transparency Notice:** The architecture, backend logic, and frontend codebase were *primarily* written and iterated by Google's Gemini Pro large language model under the direction of a human project manager. The focus is on **function**, **modularity**, and **privacy**.
 
