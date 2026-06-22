@@ -1,7 +1,7 @@
 # Add To Vault
 The self-hosted backend engine for the ***Add To Vault ecosystem***. This server handles web scraping, LLM processing, and secure API communication with your Obsidian vault.
 
-**Transparency Notice:** *This project is "vibe-coded".* The architecture, backend logic, and frontend codebase were *primarily* written and iterated by Google's Gemini Pro large language model under the direction of a human project manager. The focus is on **function**, **modularity**, and **privacy**.
+**Transparency Notice:** The architecture, backend logic, and frontend codebase were *primarily* written and iterated by Google's Gemini Pro large language model under the direction of a human project manager. The focus is on **function**, **modularity**, and **privacy**.
 
 ![alt text](https://raw.githubusercontent.com/epicylon/add-to-vault/refs/heads/demo/scr/atv-screenshot-1.png "Add To Vault Overview")
 
