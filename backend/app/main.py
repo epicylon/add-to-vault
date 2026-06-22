@@ -182,7 +182,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         with open(prefs_file, "r", encoding="utf-8") as f:
             prefs = json.load(f)
 
-        # Hent hvelvkontekst (filnavn og tags)
+        # Fetch vault context (filename & tags)
         vault_context_list = []
         index_file = os.path.join(DATA_DIR, f"vault_index_{current_user.username}.json")
         if os.path.exists(index_file):
@@ -195,7 +195,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
                     else:
                         vault_context_list.append(item)
 
-        # Skrap innholdet fra URL
+        # Scrape from URL
         title, content = await run_in_threadpool(scrape_url, request.url)
         if not content:
             raise HTTPException(status_code=400, detail="Could not find content at the provided link.")
@@ -207,7 +207,7 @@ async def process_link(request: schemas.LinkRequest, current_user: models.User =
         if not prompt_template:
             raise HTTPException(status_code=400, detail=f"Missing template for mode: {mode}. Please configure it in Obsidian and sync.")
 
-        # Generer notat ved hjelp av det oppdaterte LLM-maskineriet
+        # Generate note
         markdown_result = await process_text_with_llm(
             url=request.url,
             title=title,
