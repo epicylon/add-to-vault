@@ -2,15 +2,35 @@ import requests
 from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
 
+
+def _resolve_url(url: str, headers: dict, timeout: int = 10) -> str:
+    """
+    Follows redirects to resolve short/share/mobile links to their canonical URL.
+    Uses a HEAD request for speed (no body download).
+    """
+    try:
+        resp = requests.head(url, headers=headers, timeout=timeout, allow_redirects=True)
+        return resp.url
+    except Exception:
+        return url  # Fallback: return original if resolution fails
+
+
 def scrape_url(url: str):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
+    # --- STEP 1: AUTO-RESOLVE REDIRECTS ---
+    # Handles Reddit /s/ share links, mobile links (i.reddit.com, old.reddit.com),
+    # URL shorteners (bit.ly, t.co), and any other redirects — all transparently.
+    resolved_url = _resolve_url(url, headers)
+    
+    # Normalize: strip query params, fragments, and trailing slash
+    clean_url = resolved_url.split("?")[0].split("#")[0].rstrip("/")
+
     # --- REDDIT RSS HANDLER ---
-    if "reddit.com" in url or "redd.it" in url:
-        # Clean URL and append .rss
-        clean_url = url.split("?")[0].rstrip("/")
+    # Strictly match canonical post URLs: /r/{sub}/comments/{id}/...
+    if "/r/" in clean_url and "/comments/" in clean_url:
         rss_url = f"{clean_url}/.rss"
         
         try:
@@ -27,7 +47,6 @@ def scrape_url(url: str):
                 
                 content_text = ""
                 if content_elem is not None and content_elem.text:
-                    # Reddit embeds HTML inside the XML content. Clean it with BeautifulSoup.
                     soup = BeautifulSoup(content_elem.text, "html.parser")
                     content_text = soup.get_text(separator="\n", strip=True)
                 
@@ -41,74 +60,19 @@ def scrape_url(url: str):
         except Exception as e:
             return "Reddit RSS Scraping Failed", f"Could not fetch Reddit via RSS: {str(e)}"
 
-    # --- JINA READER HANDLER (For other complex SPAs like X/Twitter) ---
-    difficult_domains = ["twitter.com", "x.com", "instagram.com"]
-    is_difficult = any(domain in url for domain in difficult_domains)
-
-    if is_difficult:
-        jina_url = f"https://r.jina.ai/{url}"
-        try:
-            response = requests.get(jina_url, headers=headers, timeout=20)
-            response.raise_for_status()
-            
-            text = response.text
-            title = "Scraped via Jina (Title missing)"
-            
-            lines = text.split("\n")
-            if lines and len(lines[0]) > 0 and "Title:" in lines[0]:
-                title = lines[0].replace("Title:", "").strip()
-            
-            return title, text
-            
-        except Exception as e:
-            return "Jina scraping failed", f"Could not fetch content via Jina: {str(e)}"
-
-    # --- STANDARD WEBPAGE HANDLER (For Substack, blogs, articles) ---
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, "html.parser")
-        
-        title = soup.title.string.strip() if soup.title else "Untitled"
-        
-        # Remove noise like menus, footers, and scripts
-        for element in soup(["script", "style", "nav", "footer", "aside"]):
-            element.decompose()
-            
-        text = soup.get_text(separator="\n", strip=True)
-        return title, text
-        
-    except Exception as e:
-        return "Scraping failed", f"Could not scrape the webpage: {str(e)}"import requests
-from bs4 import BeautifulSoup
-
-def scrape_url(url: str):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
-    difficult_domains = ["reddit.com", "redd.it", "twitter.com", "x.com", "instagram.com"]
-    is_difficult = any(domain in url for domain in difficult_domains)
-
     # --- JINA READER HANDLER ---
-    if is_difficult:
-        # Try old.reddit.com to bypass Cloudflare-checks
-        if "reddit.com" in url:
-            url = url.replace("www.reddit.com", "old.reddit.com")
+    difficult_domains = ["twitter.com", "x.com", "instagram.com"]
+    is_difficult = any(domain in clean_url for domain in difficult_domains)
 
-        jina_url = f"https://r.jina.ai/{url}"
+    if is_difficult:
+        jina_url = f"https://r.jina.ai/{clean_url}"
         try:
             response = requests.get(jina_url, headers=headers, timeout=20)
             response.raise_for_status()
             
             text = response.text
-
-            # Check if Jina returned "soft error" (successful request, but blocked by target)
-            if "Target URL returned error" in text or "You've been blocked by network security" in text:
-                return "Scraping Blocked", f"The target website actively blocked the scraping attempt. \n\n**Raw output:**\n{text[:300]}"
-            
             title = "Scraped via Jina (Title missing)"
+            
             lines = text.split("\n")
             if lines and len(lines[0]) > 0 and "Title:" in lines[0]:
                 title = lines[0].replace("Title:", "").strip()
@@ -120,7 +84,7 @@ def scrape_url(url: str):
 
     # --- STANDARD WEBPAGE HANDLER ---
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(clean_url, headers=headers, timeout=10)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.content, "html.parser")
