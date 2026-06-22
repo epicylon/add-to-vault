@@ -7,6 +7,37 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import re
 
+def _validate_links(markdown: str, vault_context_data: list) -> str:
+    """
+    Strip hallucinated [[links]] that don't match a real filename in the vault index.
+    Preserves the [[bracket]] syntax for valid links.
+    """
+    if not vault_context_data:
+        return markdown
+
+    # Build a set of valid filenames (basename only, no extension)
+    valid_names = set()
+    for note in vault_context_data:
+        path = note.get("path", "")
+        # Handle both "Folder/Note.md" and "Note.md" formats
+        basename = path.split("/")[-1] if "/" in path else path
+        # Strip .md extension if present
+        if basename.endswith(".md"):
+            basename = basename[:-3]
+        valid_names.add(basename)
+
+    def replace_invalid_link(match: re.Match) -> str:
+        inner = match.group(1).strip()
+        # Support [[Note]] and [[Note|alias]] syntax
+        target = inner.split("|")[0].strip()
+        if target in valid_names:
+            return match.group(0)  # keep original
+        return inner  # strip brackets, leave plain text
+
+    # Matches [[anything]] including with aliases
+    return re.sub(r"\[\[(.*?)\]\]", replace_invalid_link, markdown)
+
+
 def get_llm(provider: str, model_name: str, api_key: str):
     """Factory funksjon som returnerer riktig LLM-klient basert på valgt provider."""
     temperature = 0.3
@@ -18,14 +49,14 @@ def get_llm(provider: str, model_name: str, api_key: str):
     elif provider == "mistral":
         return ChatMistralAI(model=model_name, temperature=temperature, api_key=api_key)
     elif provider == "kimi":
-        # Kimi (Moonshot AI) uses OpenAI-compatible API, base_url overruled
+        # Kimi (Moonshot AI) bruker OpenAI-kompatibelt API, vi overstyrer bare base_url
         return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key, base_url="https://api.moonshot.cn/v1")
     elif provider == "ollama":
-        # For Ollama a URL is expected in the API-key field, or else fallback to docker localhost
+        # For Ollama forventer vi at brukeren skriver inn URL-en i API-nøkkel feltet, ellers faller vi tilbake til docker localhost
         base_url = api_key if api_key and api_key.startswith("http") else "http://host.docker.internal:11434"
         return ChatOllama(model=model_name, temperature=temperature, base_url=base_url)
     else:
-        # Standard fallback is Google Gemini
+        # Standard fallback er Google Gemini
         return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
 
 async def process_text_with_llm(url: str, title: str, content: str, api_key: str, provider: str, model_name: str, prompt_template: str, vault_context_data: list, use_multipass: bool = False) -> str:
@@ -46,7 +77,7 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
             context_lines.append(f"- {note['path']} [{tags_str}]")
         context_string = "\n".join(context_lines) if context_lines else "No notes."
 
-        # Fetches correct LLM-client
+        # Henter riktig LLM-klient fra fabrikken vår
         llm = get_llm(provider, model_name, api_key)
 
         classified_tags_text = ""
