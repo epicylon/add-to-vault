@@ -27,6 +27,13 @@ os.makedirs(VAULT_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
+# ── STATIC FILE SERVING ───────────────────────────────────────────────────
+# Mount Vite production assets FIRST (hashed JS/CSS bundles)
+assets_dir = os.path.join(STATIC_DIR, "assets")
+if os.path.exists(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+# Keep /static mount for any manually placed files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/", tags=["UI"])
@@ -67,7 +74,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         username=user.username,
         hashed_password=hashed_password,
         sync_strategy=user.sync_strategy,
-        is_admin=is_first_user 
+        is_admin=is_first_user
     )
     db.add(new_user)
     db.commit()
@@ -79,7 +86,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     user = db.query(models.User).filter(models.User.username == form_data.username).first()
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect credentials", headers={"WWW-Authenticate": "Bearer"})
-    
+
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}

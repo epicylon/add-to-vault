@@ -1,11 +1,34 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_mistralai import ChatMistralAI
-from langchain_community.chat_models import ChatOllama
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import re
+
+def get_llm(provider: str, model_name: str, api_key: str):
+    """Factory funksjon som returnerer riktig LLM-klient basert på valgt provider."""
+    temperature = 0.3
+
+    if provider == "openai":
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key)
+    elif provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+        return ChatAnthropic(model=model_name, temperature=temperature, api_key=api_key)
+    elif provider == "mistral":
+        from langchain_mistralai import ChatMistralAI
+        return ChatMistralAI(model=model_name, temperature=temperature, api_key=api_key)
+    elif provider == "kimi":
+        # Kimi (Moonshot AI) bruker OpenAI-kompatibelt API, vi overstyrer bare base_url
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key, base_url="https://api.moonshot.cn/v1")
+    elif provider == "ollama":
+        # For Ollama forventer vi at brukeren skriver inn URL-en i API-nøkkel feltet, ellers faller vi tilbake til docker localhost
+        from langchain_community.chat_models import ChatOllama
+        base_url = api_key if api_key and api_key.startswith("http") else "http://host.docker.internal:11434"
+        return ChatOllama(model=model_name, temperature=temperature, base_url=base_url)
+    else:
+        # Standard fallback er Google Gemini
+        return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
+
 
 def _validate_links(markdown: str, vault_context_data: list) -> str:
     """
@@ -38,26 +61,13 @@ def _validate_links(markdown: str, vault_context_data: list) -> str:
     return re.sub(r"\[\[(.*?)\]\]", replace_invalid_link, markdown)
 
 
-def get_llm(provider: str, model_name: str, api_key: str):
-    """Factory funksjon som returnerer riktig LLM-klient basert på valgt provider."""
-    temperature = 0.3
+def _escape_braces(text: str) -> str:
+    """
+    Escape literal curly braces so they don't break Python str.format() / PromptTemplate.
+    Replaces { with {{ and } with }} so they survive template substitution.
+    """
+    return text.replace("{", "{{").replace("}", "}}")
 
-    if provider == "openai":
-        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key)
-    elif provider == "anthropic":
-        return ChatAnthropic(model=model_name, temperature=temperature, api_key=api_key)
-    elif provider == "mistral":
-        return ChatMistralAI(model=model_name, temperature=temperature, api_key=api_key)
-    elif provider == "kimi":
-        # Kimi (Moonshot AI) bruker OpenAI-kompatibelt API, vi overstyrer bare base_url
-        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key, base_url="https://api.moonshot.cn/v1")
-    elif provider == "ollama":
-        # For Ollama forventer vi at brukeren skriver inn URL-en i API-nøkkel feltet, ellers faller vi tilbake til docker localhost
-        base_url = api_key if api_key and api_key.startswith("http") else "http://host.docker.internal:11434"
-        return ChatOllama(model=model_name, temperature=temperature, base_url=base_url)
-    else:
-        # Standard fallback er Google Gemini
-        return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
 
 async def process_text_with_llm(url: str, title: str, content: str, api_key: str, provider: str, model_name: str, prompt_template: str, vault_context_data: list, use_multipass: bool = False) -> str:
     # Sikkerhetssjekk: Ollama trenger ikke nødvendigvis en nøkkel, men andre gjør det
@@ -82,12 +92,12 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
 
         classified_tags_text = ""
         if use_multipass:
-            classification_prompt_text = f"""
+            classification_prompt_text = """
             You are a strict data classifier. Analyze the following text and select the most relevant tags from the user's existing vault tags.
-            Existing Tags: {all_tags_str}
+            Existing Tags: {tags}
 
             Text:
-            {content[:2500]}...
+            {text}
 
             Rules:
             1. Return ONLY a comma-separated list of tags. 
@@ -98,7 +108,13 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
             """
             class_prompt = PromptTemplate.from_template(classification_prompt_text)
             class_chain = class_prompt | llm | StrOutputParser()
-            classified_tags = await class_chain.ainvoke({})
+
+            # Escape braces in content before passing to template
+            safe_content = _escape_braces(content[:2500])
+            classified_tags = await class_chain.ainvoke({
+                "tags": all_tags_str,
+                "text": safe_content
+            })
 
             # Robust tag cleaning: normalize whitespace, replace spaces with hyphens,
             # collapse multiple hyphens, strip, lowercase, remove invalid chars
@@ -144,13 +160,15 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
         prompt = PromptTemplate.from_template(actual_prompt)
         chain = prompt | llm | StrOutputParser()
 
+        # Escape braces in all user-provided content before template substitution
         result = await chain.ainvoke({
-            "title": title,
-            "content": content,
-            "url": url,
-            "vault_context": context_string
+            "title": _escape_braces(title),
+            "content": _escape_braces(content),
+            "url": _escape_braces(url),
+            "vault_context": _escape_braces(context_string)
         })
         return result
 
     except Exception as e:
         return f"# Error in LLM processing\nCheck that your template uses the correct variables ({{title}}, {{url}}, {{content}}, {{vault_context}}). Avoid single curly braces outside of variables.\n\n**Details:** {str(e)}"
+
