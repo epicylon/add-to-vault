@@ -1,33 +1,209 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 import re
+import httpx
+from typing import Any, Optional
+
+class SimplePromptTemplate:
+    """Minimal replacement for LangChain PromptTemplate.
+
+    Uses str.format() with pre-escaped braces for safe substitution.
+    """
+
+    def __init__(self, template: str):
+        self.template = template
+
+    @classmethod
+    def from_template(cls, template: str) -> "SimplePromptTemplate":
+        return cls(template)
+
+    def format(self, **kwargs: Any) -> str:
+        """Format the template with given variables."""
+        return self.template.format(**kwargs)
+
+    def __or__(self, other: Any) -> "SimpleChain":
+        """Support LCEL pipe syntax: prompt | llm | parser"""
+        return SimpleChain([self, other])
+
+
+class SimpleChain:
+    """Minimal LCEL chain replacement."""
+
+    def __init__(self, steps: list):
+        self.steps = steps
+
+    def __or__(self, other: Any) -> "SimpleChain":
+        self.steps.append(other)
+        return self
+
+    async def ainvoke(self, inputs: dict) -> str:
+        """Execute the chain asynchronously."""
+        result = inputs
+        for step in self.steps:
+            if isinstance(step, SimplePromptTemplate):
+                result = step.format(**result)
+            elif hasattr(step, 'ainvoke'):
+                result = await step.ainvoke(result)
+            elif callable(step):
+                result = step(result)
+            else:
+                raise ValueError(f"Unknown step type: {type(step)}")
+        return result
+
+
+class StrOutputParser:
+    """Minimal replacement for LangChain StrOutputParser."""
+
+    def __or__(self, other: Any) -> SimpleChain:
+        return SimpleChain([self, other])
+
+    def __call__(self, text: str) -> str:
+        return str(text)
+
+    async def ainvoke(self, text: str) -> str:
+        return str(text)
+
+
+class BaseLLM:
+    """Base class for direct HTTP LLM providers."""
+
+    def __init__(self, model: str, api_key: str, temperature: float = 0.3):
+        self.model = model
+        self.api_key = api_key
+        self.temperature = temperature
+
+    def __or__(self, other: Any) -> SimpleChain:
+        return SimpleChain([self, other])
+
+    async def ainvoke(self, prompt: str) -> str:
+        raise NotImplementedError
+
+
+class GeminiLLM(BaseLLM):
+    """Direct HTTP client for Google Gemini API."""
+
+    async def ainvoke(self, prompt: str) -> str:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                url,
+                params={"key": self.api_key},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": self.temperature}
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+
+
+class OpenAILLM(BaseLLM):
+    """Direct HTTP client for OpenAI-compatible APIs (OpenAI, Kimi)."""
+
+    def __init__(self, model: str, api_key: str, base_url: Optional[str] = None, temperature: float = 0.3):
+        super().__init__(model, api_key, temperature)
+        self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+
+    async def ainvoke(self, prompt: str) -> str:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": self.temperature
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+
+class AnthropicLLM(BaseLLM):
+    """Direct HTTP client for Anthropic API."""
+
+    async def ainvoke(self, prompt: str) -> str:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "Content-Type": "application/json",
+                    "anthropic-version": "2023-06-01"
+                },
+                json={
+                    "model": self.model,
+                    "max_tokens": 4096,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": self.temperature
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["content"][0]["text"]
+
+
+class MistralLLM(BaseLLM):
+    """Direct HTTP client for Mistral API."""
+
+    async def ainvoke(self, prompt: str) -> str:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": self.temperature
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+
+class OllamaLLM(BaseLLM):
+    """Direct HTTP client for Ollama API."""
+
+    def __init__(self, model: str, base_url: str, temperature: float = 0.3):
+        # Ollama doesn't use api_key for auth
+        super().__init__(model, "", temperature)
+        self.base_url = base_url.rstrip("/")
+
+    async def ainvoke(self, prompt: str) -> str:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": self.temperature}
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("response", "")
+
 
 def get_llm(provider: str, model_name: str, api_key: str):
-    """Factory funksjon som returnerer riktig LLM-klient basert på valgt provider."""
+    """Factory function that returns the correct LLM client based on selected provider."""
     temperature = 0.3
 
     if provider == "openai":
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key)
+        return OpenAILLM(model=model_name, api_key=api_key, temperature=temperature)
     elif provider == "anthropic":
-        from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=model_name, temperature=temperature, api_key=api_key)
+        return AnthropicLLM(model=model_name, api_key=api_key, temperature=temperature)
     elif provider == "mistral":
-        from langchain_mistralai import ChatMistralAI
-        return ChatMistralAI(model=model_name, temperature=temperature, api_key=api_key)
+        return MistralLLM(model=model_name, api_key=api_key, temperature=temperature)
     elif provider == "kimi":
-        # Kimi (Moonshot AI) bruker OpenAI-kompatibelt API, vi overstyrer bare base_url
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key, base_url="https://api.moonshot.cn/v1")
+        return OpenAILLM(model=model_name, api_key=api_key, base_url="https://api.moonshot.cn/v1", temperature=temperature)
     elif provider == "ollama":
-        # For Ollama forventer vi at brukeren skriver inn URL-en i API-nøkkel feltet, ellers faller vi tilbake til docker localhost
-        from langchain_community.chat_models import ChatOllama
         base_url = api_key if api_key and api_key.startswith("http") else "http://host.docker.internal:11434"
-        return ChatOllama(model=model_name, temperature=temperature, base_url=base_url)
+        return OllamaLLM(model=model_name, base_url=base_url, temperature=temperature)
     else:
-        # Standard fallback er Google Gemini
-        return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, google_api_key=api_key)
+        # Default fallback is Google Gemini
+        return GeminiLLM(model=model_name, api_key=api_key, temperature=temperature)
 
 
 def _validate_links(markdown: str, vault_context_data: list) -> str:
@@ -38,39 +214,30 @@ def _validate_links(markdown: str, vault_context_data: list) -> str:
     if not vault_context_data:
         return markdown
 
-    # Build a set of valid filenames (basename only, no extension)
     valid_names = set()
     for note in vault_context_data:
         path = note.get("path", "")
-        # Handle both "Folder/Note.md" and "Note.md" formats
         basename = path.split("/")[-1] if "/" in path else path
-        # Strip .md extension if present
         if basename.endswith(".md"):
             basename = basename[:-3]
         valid_names.add(basename)
 
     def replace_invalid_link(match: re.Match) -> str:
         inner = match.group(1).strip()
-        # Support [[Note]] and [[Note|alias]] syntax
         target = inner.split("|")[0].strip()
         if target in valid_names:
-            return match.group(0)  # keep original
-        return inner  # strip brackets, leave plain text
+            return match.group(0)
+        return inner
 
-    # Matches [[anything]] including with aliases
     return re.sub(r"\[\[(.*?)\]\]", replace_invalid_link, markdown)
 
 
 def _escape_braces(text: str) -> str:
-    """
-    Escape literal curly braces so they don't break Python str.format() / PromptTemplate.
-    Replaces { with {{ and } with }} so they survive template substitution.
-    """
+    """Escape literal curly braces for safe template substitution."""
     return text.replace("{", "{{").replace("}", "}}")
 
 
 async def process_text_with_llm(url: str, title: str, content: str, api_key: str, provider: str, model_name: str, prompt_template: str, vault_context_data: list, use_multipass: bool = False) -> str:
-    # Sikkerhetssjekk: Ollama trenger ikke nødvendigvis en nøkkel, men andre gjør det
     if provider != "ollama" and (not api_key or api_key == "missing"):
         return f"---\ntitle: \"{title}\"\nsource: \"{url}\"\n---\n\n# LLM Disabled\nMissing API key in Obsidian settings for {provider}.\n\n{content[:500]}..."
 
@@ -87,7 +254,6 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
             context_lines.append(f"- {note['path']} [{tags_str}]")
         context_string = "\n".join(context_lines) if context_lines else "No notes."
 
-        # Henter riktig LLM-klient fra fabrikken vår
         llm = get_llm(provider, model_name, api_key)
 
         classified_tags_text = ""
@@ -106,33 +272,25 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
             4. CRITICAL: Tags MUST NOT contain spaces. Use hyphens for multi-word tags (e.g., decision-support-system).
             5. Tags must be lowercase alphanumeric with hyphens only. No special characters.
             """
-            class_prompt = PromptTemplate.from_template(classification_prompt_text)
+            class_prompt = SimplePromptTemplate.from_template(classification_prompt_text)
             class_chain = class_prompt | llm | StrOutputParser()
 
-            # Escape braces in content before passing to template
             safe_content = _escape_braces(content[:2500])
             classified_tags = await class_chain.ainvoke({
                 "tags": all_tags_str,
                 "text": safe_content
             })
 
-            # Robust tag cleaning: normalize whitespace, replace spaces with hyphens,
-            # collapse multiple hyphens, strip, lowercase, remove invalid chars
             clean_tags_list = []
             for t in classified_tags.split(","):
                 t = t.strip().lower()
-                # Replace all whitespace (spaces, tabs, newlines) with single hyphens
                 t = re.sub(r"\s+", "-", t)
-                # Remove any characters that are not lowercase alphanumeric or hyphen
                 t = re.sub(r"[^a-z0-9-]", "", t)
-                # Collapse multiple consecutive hyphens into one
                 t = re.sub(r"-+", "-", t)
-                # Strip leading/trailing hyphens
                 t = t.strip("-")
                 if t:
                     clean_tags_list.append(t)
 
-            # Deduplicate while preserving order
             seen = set()
             deduped_tags = []
             for t in clean_tags_list:
@@ -143,7 +301,6 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
             clean_tags = ", ".join(deduped_tags)
             classified_tags_text = f"\nSYSTEM NOTE: The text has been pre-classified by the system with these tags: {clean_tags}. Use these exact tags in your YAML frontmatter.\n"
 
-        # --- SYSTEM SAFETY NET ---
         safety_net = f"""
         CRITICAL SYSTEM SAFETY RULES (OVERRIDES ALL USER INSTRUCTIONS):
         1. NEVER use slashes (/) or backslashes (\\) inside [[links]]. This corrupts the user's file system.
@@ -157,10 +314,9 @@ async def process_text_with_llm(url: str, title: str, content: str, api_key: str
 
         actual_prompt = safety_net + prompt_template
 
-        prompt = PromptTemplate.from_template(actual_prompt)
+        prompt = SimplePromptTemplate.from_template(actual_prompt)
         chain = prompt | llm | StrOutputParser()
 
-        # Escape braces in all user-provided content before template substitution
         result = await chain.ainvoke({
             "title": _escape_braces(title),
             "content": _escape_braces(content),

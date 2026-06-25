@@ -1,7 +1,7 @@
 import os
 import re
 import json
-import google.generativeai as genai
+import httpx
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.concurrency import run_in_threadpool
@@ -74,7 +74,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         username=user.username,
         hashed_password=hashed_password,
         sync_strategy=user.sync_strategy,
-        is_admin=is_first_user
+        is_admin=is_first_user 
     )
     db.add(new_user)
     db.commit()
@@ -86,7 +86,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     user = db.query(models.User).filter(models.User.username == form_data.username).first()
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect credentials", headers={"WWW-Authenticate": "Bearer"})
-
+    
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
@@ -134,9 +134,18 @@ async def validate_provider(request: schemas.ValidateProviderRequest):
         api_key = request.api_key
 
         if provider == "gemini":
-            genai.configure(api_key=api_key)
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            return {"supported_models": available_models}
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    "https://generativelanguage.googleapis.com/v1beta/models",
+                    params={"key": api_key}
+                )
+                response.raise_for_status()
+                data = response.json()
+                available_models = [
+                    m["name"] for m in data.get("models", [])
+                    if "generateContent" in m.get("supportedGenerationMethods", [])
+                ]
+                return {"supported_models": available_models}
         elif provider == "openai":
             return {"supported_models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]}
         elif provider == "anthropic":

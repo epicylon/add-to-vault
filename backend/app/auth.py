@@ -4,7 +4,8 @@ import warnings
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError as JWTError
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends, HTTPException, status
@@ -14,9 +15,6 @@ from . import models, database
 
 
 # ── Security Configuration ────────────────────────────────────────────────
-# Production: JWT_SECRET_KEY MUST be set via environment variable.
-# The fallback default is only for local development and triggers a warning.
-
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 
 if not SECRET_KEY:
@@ -56,13 +54,6 @@ def create_access_token(
 ) -> str:
     """
     Create a JWT access token.
-
-    Args:
-        data: Payload to encode (must contain 'sub' for the username).
-        expires_delta: Optional custom expiry duration. Defaults to 15 minutes.
-
-    Returns:
-        Encoded JWT string.
     """
     to_encode = data.copy()
     if expires_delta:
@@ -82,9 +73,6 @@ def get_current_user(
 ) -> models.User:
     """
     Dependency that resolves the currently authenticated user from a Bearer token.
-
-    Raises:
-        HTTPException(401): If the token is missing, invalid, expired, or the user does not exist.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
